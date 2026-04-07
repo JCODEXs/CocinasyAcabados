@@ -1,0 +1,662 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url      = env("DATABASE_URL")
+}
+
+// Necessary for Next auth
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // @db.Text
+  access_token             String? // @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? // @db.Text
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  role          Role      @default(INSTALLER)
+  createdAt     DateTime  @default(now())
+
+  catalog  Catalog?
+  projects Project[]
+  clients  Client[]
+}
+
+enum Role {
+  INSTALLER
+  ADMIN
+}
+
+// ============================================
+// CATÁLOGO POR INSTALADOR
+// ============================================
+
+model Catalog {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  elementTypes     ElementType[]
+  materials        Material[]
+  hardware         Hardware[]
+  surfaceFinishes  SurfaceFinish[]
+  edgeTreatments   EdgeTreatment[]
+  assemblySupplies AssemblySupply[]
+  finishes         Finish[] // Acabados de obra
+}
+
+// ============================================
+// TIPOS DE ELEMENTO (Muebles, electrodomésticos, etc)
+// ============================================
+
+model ElementType {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name      String // "Mueble Bajo", "Mueble Alto", "Mesón"
+  category  ElementCategory
+  unit      PricingUnit // POR_ML, POR_M2, POR_UNIDAD
+  basePrice Decimal         @db.Decimal(10, 2)
+
+  // Dimensiones por defecto (cm)
+  defaultWidth  Float?
+  defaultHeight Float?
+  defaultDepth  Float?
+
+  // Referencia al modelo Three.js
+  threeJsModel String // e.g. "LowerCabinet", "UpperCabinet"
+
+  // Opciones permitidas
+  allowCustomWidth  Boolean @default(true)
+  allowCustomHeight Boolean @default(false)
+  allowCustomDepth  Boolean @default(false)
+
+  // Templates de componentes para este tipo
+  componentTemplates ComponentTemplate[]
+
+  quoteItems QuoteItem[]
+}
+
+enum ElementCategory {
+  MUEBLE_BAJO
+  MUEBLE_ALTO
+  MESON
+  ELECTRODOMESTICO
+  PANEL_YESO
+  SUPERBOARD
+  PUERTA
+  ESTANTE
+  OTRO
+}
+
+enum PricingUnit {
+  POR_ML // metros lineales
+  POR_M2 // metros cuadrados
+  POR_UNIDAD // por unidad
+}
+
+// ============================================
+// MATERIALES (Tableros: MDF, Melamina, etc)
+// ============================================
+
+model Material {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name        String
+  category    MaterialCategory
+  pricePerM2  Decimal          @db.Decimal(10, 2) // Precio por m² del tablero
+  thicknessMM Int              @default(18) // Espesor estándar
+
+  // Texturas para visor 3D
+  textureUrl    String?
+  roughnessMap  String?
+  normalMap     String?
+  color         String? // hex fallback
+  aiDescription String? // para prompt de IA
+
+  isActive Boolean @default(true)
+
+  quoteItemComponents QuoteItemComponent[]
+}
+
+enum MaterialCategory {
+  MADERA_NATURAL
+  MDF_LACADO
+  MELAMINA
+  GRANITO
+  MARMOL
+  CUARZO
+  CERAMICA
+  PANEL_YESO
+  SUPERBOARD
+  OTRO
+}
+
+// ============================================
+// HERRAJES (Bisagras, rieles, jaladores, etc)
+// ============================================
+
+model Hardware {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name        String // "Bisagra hidráulica Blum"
+  category    HardwareCategory
+  qualityTier QualityTier
+  brand       String?
+
+  pricePerUnit Decimal @db.Decimal(10, 2)
+  unit         String  @default("und") // und, par, juego
+
+  description String?
+  imageUrl    String?
+  threeDModel String? // Modelo 3D para visualización
+
+  hardwareItems HardwareItem[]
+}
+
+enum HardwareCategory {
+  BISAGRA
+  RIEL_CAJON
+  JALADOR
+  CORREDERA
+  PATAS_NIVELADORA
+  BISAGRA_PIANO
+  AMORTIGUADOR
+  CERRADURA
+  CLIP_ESTANTE
+  OTRO
+}
+
+enum QualityTier {
+  ECONOMICO
+  ESTANDAR
+  PREMIUM
+  LUJO
+}
+
+// ============================================
+// ACABADOS SUPERFICIALES (Lacado, chapa, etc)
+// ============================================
+
+model SurfaceFinish {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name       String // "Lacado blanco mate"
+  type       SurfaceFinishType
+  pricePerM2 Decimal           @db.Decimal(10, 2)
+
+  textureUrl    String?
+  roughnessMap  String?
+  normalMap     String?
+  color         String? // hex fallback
+  aiDescription String? // para IA
+
+  isActive Boolean @default(true)
+
+  quoteItemComponents QuoteItemComponent[]
+}
+
+enum SurfaceFinishType {
+  LACADO
+  CHAPA_MADERA
+  MELAMINA
+  VINILO_ADHESIVO
+  PINTURA
+  BARNIZ
+  SIN_ACABADO
+}
+
+// ============================================
+// CANTOS Y BORDES
+// ============================================
+
+model EdgeTreatment {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name        String // "Canto PVC 2mm", "Chaflan 45°"
+  type        EdgeType
+  pricePerML  Decimal  @db.Decimal(10, 2) // precio por metro lineal
+  thicknessMM Int? // espesor del canto
+
+  description String?
+
+  componentEdges ComponentEdge[]
+}
+
+enum EdgeType {
+  CANTO_MELAMINA
+  CANTO_PVC
+  PERFIL_ALUMINIO
+  CHAFLAN_45
+  MEDIA_CANNA
+  MOLDURA
+  POSTFORMADO
+  SIN_CANTO
+}
+
+// ============================================
+// INSUMOS DE ENSAMBLE (Tornillos, pegantes, etc)
+// ============================================
+
+model AssemblySupply {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name         String // "Tornillo Confirmat 7×50"
+  category     SupplyCategory
+  unit         String // und, ml, kg, m
+  pricePerUnit Decimal        @db.Decimal(10, 2)
+
+  autoCalcRule String? // "8_PER_PANEL" | "0.15L_PER_M2"
+
+  quoteItemSupplies QuoteItemSupply[]
+}
+
+enum SupplyCategory {
+  TORNILLO
+  TARUGO
+  PEGANTE
+  SEPARADOR
+  ANCLAJE
+  PERFIL_UNION
+  MECANIZADO
+  OTRO
+}
+
+// ============================================
+// ACABADOS DE OBRA (Pintura, estucado, etc)
+// ============================================
+
+model Finish {
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
+
+  name       String // "Estucado y pintura", "Instalación de piso"
+  pricePerM2 Decimal @db.Decimal(10, 2)
+  unit       String  @default("m²")
+
+  projectFinishes ProjectFinish[]
+}
+
+// ============================================
+// TEMPLATES DE COMPONENTES (Reglas de construcción)
+// ============================================
+
+model ComponentTemplate {
+  id            String      @id @default(cuid())
+  elementTypeId String
+  elementType   ElementType @relation(fields: [elementTypeId], references: [id])
+
+  componentType ComponentType
+  label         String? // "Lateral izquierdo"
+
+  // Fórmulas relativas a dimensiones del mueble (W, H, D en cm)
+  widthFormula  String // "W" o "W - 3.6"
+  heightFormula String // "H - 3.6"
+  thicknessMM   Int    @default(18)
+  depthFormula  String @default("D")
+
+  quantity  Int @default(1)
+  sortOrder Int @default(0)
+
+  // Qué aristas llevan canto visible
+  topEdge    Boolean @default(false)
+  bottomEdge Boolean @default(false)
+  leftEdge   Boolean @default(false)
+  rightEdge  Boolean @default(false)
+
+  // Sugerencias por defecto
+  defaultMaterialCategory  MaterialCategory?
+  defaultSurfaceFinishType SurfaceFinishType?
+}
+
+enum ComponentType {
+  LATERAL
+  FONDO
+  TECHO
+  PISO
+  ENTREPAÑO
+  PUERTA
+  FRENTE_CAJON
+  CAJA_CAJON
+  MESON
+  ZOCALO
+  DIVISION
+  RIEL
+}
+
+// ============================================
+// CLIENTES Y PROYECTOS
+// ============================================
+
+model Client {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  name    String
+  email   String?
+  phone   String?
+  address String?
+
+  projects  Project[]
+  createdAt DateTime  @default(now())
+}
+
+model Project {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  name   String
+  status ProjectStatus @default(DRAFT)
+
+  // Dimensiones del espacio (cm)
+  roomWidth  Float?
+  roomLength Float?
+  roomHeight Float?
+
+  notes String?
+
+  // Portal del cliente
+  shareToken  String    @unique @default(cuid())
+  shareExpiry DateTime?
+
+  // Imágenes
+  referenceImageUrl String?
+  aiRenderUrl       String?
+
+  // Items del proyecto
+  quoteItems      QuoteItem[]
+  projectFinishes ProjectFinish[]
+  layoutGroups    LayoutGroup[]
+
+  // Totales
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ProjectStatus {
+  DRAFT
+  SENT
+  REVIEWING
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ============================================
+// ITEM DE COTIZACIÓN (Mueble/Elemento individual)
+// ============================================
+model QuoteItem {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  elementTypeId String
+  elementType   ElementType @relation(fields: [elementTypeId], references: [id])
+
+  label String? // "Mueble bajo esquina", "Refrigerador"
+
+  // ── Grupo de layout ──────────────────────
+  layoutGroupId String?
+  layoutGroup   LayoutGroup? @relation(fields: [layoutGroupId], references: [id])
+
+  // Posición dentro del grupo (ordenable por drag)
+  groupOrder Int @default(0)
+
+  // Cómo conecta ESTE item con el SIGUIENTE en la lista
+  connectionToNext ConnectionType @default(INLINE)
+
+  // Offset fino antes de este item (para GAP: espacio libre en cm)
+  // En INLINE/CORNER este valor es un ajuste de precisión pequeño
+  gapBeforeCm Float @default(0)
+
+  // ── Posición absoluta (calculada, no editada a mano) ──
+  // Se recalcula cada vez que cambia el grupo
+  posX      Float @default(0)
+  posY      Float @default(0) // altura desde el piso (para muebles altos)
+  posZ      Float @default(0)
+  rotationY Float @default(0) // grados
+
+  // ── Dimensiones (cm) ──────────────────────
+  width    Float
+  height   Float
+  depth    Float
+  quantity Int   @default(1)
+
+  // ── Precios ───────────────────────────────
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+
+  notes     String?
+  sortOrder Int     @default(0) // orden global en la cotización (lista)
+
+  components    QuoteItemComponent[]
+  hardwareItems HardwareItem[]
+  supplies      QuoteItemSupply[]
+}
+
+// ============================================
+// COMPONENTE REAL (Panel individual del mueble)
+// ============================================
+
+model QuoteItemComponent {
+  id          String    @id @default(cuid())
+  quoteItemId String
+  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+
+  componentType ComponentType
+  label         String?
+
+  // Dimensiones reales (cm)
+  widthCm     Float
+  heightCm    Float
+  thicknessMM Int
+
+  quantity Int @default(1)
+
+  // Material del tablero
+  materialId String?
+  material   Material? @relation(fields: [materialId], references: [id])
+
+  // Acabado superficial
+  surfaceFinishId String?
+  surfaceFinish   SurfaceFinish? @relation(fields: [surfaceFinishId], references: [id])
+
+  // Áreas calculadas
+  boardAreaM2  Float // para costo del tablero
+  finishAreaM2 Float // para costo del acabado
+
+  // Precios
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+
+  // Cantos aplicados
+  edges ComponentEdge[]
+}
+
+// ============================================
+// CANTO APLICADO A UNA ARISTA
+// ============================================
+
+model ComponentEdge {
+  id              String             @id @default(cuid())
+  componentId     String
+  component       QuoteItemComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  edgeTreatmentId String
+  edgeTreatment   EdgeTreatment      @relation(fields: [edgeTreatmentId], references: [id])
+
+  edgeSide   EdgeSide
+  lengthML   Float // metros lineales
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  totalPrice Decimal  @db.Decimal(10, 2)
+}
+
+enum EdgeSide {
+  TOP
+  BOTTOM
+  LEFT
+  RIGHT
+}
+
+// ============================================
+// HERRAJE APLICADO A UN ITEM
+// ============================================
+
+model HardwareItem {
+  id          String    @id @default(cuid())
+  quoteItemId String
+  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  hardwareId  String
+  hardware    Hardware  @relation(fields: [hardwareId], references: [id])
+
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes      String?
+}
+
+// ============================================
+// INSUMO APLICADO A UN ITEM
+// ============================================
+
+model QuoteItemSupply {
+  id               String         @id @default(cuid())
+  quoteItemId      String
+  quoteItem        QuoteItem      @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  assemblySupplyId String
+  assemblySupply   AssemblySupply @relation(fields: [assemblySupplyId], references: [id])
+
+  quantity   Float
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes      String?
+}
+
+// ============================================
+// ACABADO DE OBRA APLICADO AL PROYECTO
+// ============================================
+
+model ProjectFinish {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  finishId  String
+  finish    Finish  @relation(fields: [finishId], references: [id])
+
+  areaM2     Float
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes      String?
+}
+
+// ============================================
+// GRUPO DE LAYOUT (Pared, isla, península)
+// ============================================
+
+model LayoutGroup {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name String // "Pared norte", "Isla central", "Módulo esquina"
+  type GroupType
+
+  // Punto de inicio del grupo en el plano de planta (cm)
+  // Origen = esquina suroeste del espacio
+  startX Float @default(0)
+  startY Float @default(0) // Y en plano 2D = Z en espacio 3D
+
+  // Ángulo inicial del grupo (0° = hacia este, 90° = hacia norte)
+  baseAngle Float @default(0)
+
+  sortOrder Int @default(0)
+
+  items QuoteItem[]
+}
+
+enum GroupType {
+  WALL_RUN // línea recta de muebles pegados a una pared
+  ISLAND // isla central, libre de paredes
+  PENINSULA // conectada a pared por un extremo
+  L_SHAPE // dos tramos en L (el giro se maneja con CORNER_90)
+  U_SHAPE // tres tramos en U
+  STANDALONE // elemento individual sin grupo
+}
+
+// ConnectionType define cómo este item conecta con el SIGUIENTE en el grupo
+enum ConnectionType {
+  INLINE // continúa en la misma dirección, sin separación
+  CORNER_90R // gira 90° a la derecha (sentido horario)
+  CORNER_90L // gira 90° a la izquierda
+  CORNER_45 // giro de 45° (mueble esquina octogonal)
+  GAP // hay espacio libre antes del siguiente (ventana, campana)
+  END // último item del grupo
+}
