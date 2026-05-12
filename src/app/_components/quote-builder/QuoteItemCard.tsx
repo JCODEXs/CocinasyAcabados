@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { useState } from "react";
-import { type RouterOutputs } from "@/trpc/react";
-import { api } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
+import { useOptimisticItem } from "./ui/hooks/useOptimisticItem";
 import { ComponentEditor } from "./ComponentEditor";
 import { HardwareSelector } from "./HardwareSelector";
 import { DimensionInput } from "./DimensionInput";
+import { api } from "@/trpc/react";
+import type { RouterOutputs } from "@/trpc/react";
 import {
   ChevronDownIcon, ChevronRightIcon, TrashIcon,
   WrenchScrewdriverIcon, CubeIcon, SparklesIcon,
@@ -14,23 +16,17 @@ import {
 
 type QuoteItem = RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number];
 
-const COMPONENT_LABELS: Record<string, string> = {
-  LATERAL: "Lateral", FONDO: "Fondo", TECHO: "Techo", PISO: "Piso",
-  ENTREPAÑO: "Entrepaño", PUERTA: "Puerta", FRENTE_CAJON: "Frente cajón",
-  CAJA_CAJON: "Caja cajón", MESON: "Mesón", ZOCALO: "Zócalo",
-  DIVISION: "División", RIEL: "Riel",
-};
-
 export function QuoteItemCard({ item }: { item: QuoteItem }) {
-  const { invalidate } = useQuoteBuilder();
-  const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "hardware" | "supplies">("components");
-  const [editingDims, setEditingDims] = useState(false);
+  const { invalidateProject } = useQuoteBuilder();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const { updateDimension, isPending } = useOptimisticItem(item.id);
 
-  const deleteItem = api.quotes.deleteQuoteItem.useMutation({ onSuccess: invalidate });
+  // Pure UI state — fine to be local
+  const [expanded,   setExpanded]   = useState(false);
+  const [activeTab,  setActiveTab]  = useState<"components" | "hardware" | "supplies">("components");
 
-  const updateItem = api.quotes.updateQuoteItem.useMutation({
-    onSuccess: () => { setEditingDims(false); invalidate(); },
+  const deleteItem = api.quotes.deleteQuoteItem.useMutation({
+    onSuccess: invalidateProject,
   });
 
   return (
@@ -40,13 +36,13 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
         : "border-gray-100 hover:border-gray-200 dark:border-gray-800 dark:hover:border-gray-700"
     } bg-white dark:bg-gray-900`}>
 
-      {/* ── Fila principal ─────────────────────────────────────────────── */}
+      {/* Row */}
       <div
         className="flex cursor-pointer items-center gap-2 px-3 py-2.5"
         onClick={() => setExpanded(e => !e)}
       >
         {expanded
-          ? <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          ? <ChevronDownIcon  className="h-3.5 w-3.5 shrink-0 text-gray-400" />
           : <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
         }
 
@@ -55,19 +51,25 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
             {item.label ?? item.elementType.name}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
+            {/* item comes directly from cache — always fresh */}
             {item.width} × {item.height} × {item.depth} cm
             {item.quantity > 1 && <> · ×{item.quantity}</>}
           </p>
         </div>
 
-        <span className="shrink-0 text-sm font-medium text-gray-900 dark:text-gray-100">
-          ${Number(item.totalPrice).toLocaleString("es-CO")}
+        <span className="shrink-0 min-w-[80px] text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+          {isPending
+            ? <span className="inline-block h-3 w-16 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            : `$${Number(item.totalPrice).toLocaleString("es-CO")}`
+          }
         </span>
 
         <button
           onClick={e => {
             e.stopPropagation();
-            if (confirm("¿Eliminar este elemento?")) deleteItem.mutate({ id: item.id });
+            if (confirm("¿Eliminar este elemento?")) {
+              deleteItem.mutate({ id: item.id });
+            }
           }}
           className="shrink-0 text-gray-300 hover:text-red-500 dark:text-gray-600 dark:hover:text-red-400"
         >
@@ -75,32 +77,30 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
         </button>
       </div>
 
-      {/* ── Panel expandido ────────────────────────────────────────────── */}
+      {/* Expanded */}
       {expanded && (
         <div className="border-t border-gray-100 dark:border-gray-800">
-
-          {/* Dimensiones editables */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/60 dark:bg-gray-800/30">
+          <div className="flex items-center gap-2 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/30">
             <DimensionInput
               label="Ancho"
               value={item.width}
               unit="cm"
               disabled={!item.elementType.allowCustomWidth}
-              onChange={v => updateItem.mutate({ id: item.id, width: v })}
+              onChange={v => updateDimension("width", v)}
             />
             <DimensionInput
               label="Alto"
               value={item.height}
               unit="cm"
               disabled={!item.elementType.allowCustomHeight}
-              onChange={v => updateItem.mutate({ id: item.id, height: v })}
+              onChange={v => updateDimension("height", v)}
             />
             <DimensionInput
               label="Fondo"
               value={item.depth}
               unit="cm"
               disabled={!item.elementType.allowCustomDepth}
-              onChange={v => updateItem.mutate({ id: item.id, depth: v })}
+              onChange={v => updateDimension("depth", v)}
             />
             <DimensionInput
               label="Cant."
@@ -108,16 +108,18 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
               unit=""
               min={1}
               step={1}
-              onChange={v => updateItem.mutate({ id: item.id, quantity: v })}
+              onChange={v => updateDimension("quantity", v)}
             />
+            {isPending && (
+              <span className="ml-auto text-xs text-gray-400">Calculando...</span>
+            )}
           </div>
 
-          {/* Tabs */}
           <div className="flex border-b border-gray-100 dark:border-gray-800">
             {([
-              ["components", <CubeIcon className="h-3.5 w-3.5" />, "Paneles"],
-              ["hardware",   <WrenchScrewdriverIcon className="h-3.5 w-3.5" />, "Herrajes"],
-              ["supplies",   <SparklesIcon className="h-3.5 w-3.5" />, "Insumos"],
+              ["components", <CubeIcon key={"compon"}className="h-3.5 w-3.5" />,              "Paneles"],
+              ["hardware",   <WrenchScrewdriverIcon key={"hardware"} className="h-3.5 w-3.5" />, "Herrajes"],
+              ["supplies",   <SparklesIcon key={"supplies"} className="h-3.5 w-3.5" />,          "Insumos"],
             ] as const).map(([tab, icon, label]) => (
               <button
                 key={tab}
@@ -133,13 +135,15 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
             ))}
           </div>
 
-          {/* Contenido del tab */}
           <div className="p-3">
             {activeTab === "components" && (
               <div className="space-y-2">
-                {item.components.map(component => (
-                  <ComponentEditor key={component.id} component={component} />
-                ))}
+                {item.components.length === 0
+                  ? <p className="text-xs text-gray-400">Sin paneles. ¿El tipo de elemento tiene templates?</p>
+                  : item.components.map(comp => (
+                      <ComponentEditor key={comp.id} component={comp} />
+                    ))
+                }
               </div>
             )}
 
@@ -160,7 +164,7 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
                   </div>
                 ))}
                 {item.supplies.length === 0 && (
-                  <p className="text-xs text-gray-400">Sin insumos automáticos configurados</p>
+                  <p className="text-xs text-gray-400">Sin insumos automáticos</p>
                 )}
               </div>
             )}

@@ -6,19 +6,22 @@ import { GroupType, ConnectionType } from "@prisma/client";
 import { db } from "@/server/db";
 
 export const layoutRouter = createTRPCRouter({
+  
 
   createGroup: protectedProcedure
     .input(z.object({
       projectId: z.string().cuid(),
       name: z.string().min(1),
-      type: z.nativeEnum(GroupType),
+      type:  z.nativeEnum(GroupType),
       startX: z.number().default(0),
       startY: z.number().default(0),
       baseAngle: z.number().default(0),
     }))
     .mutation(async ({ ctx, input }) => {
+        console.log("userId desde sesión:", ctx.session.user.id);
+    console.log("input recibido:", input);
       const project = await db.project.findUnique({ where: { id: input.projectId } });
-      if (!project || project.userId !== ctx.session.user.id) {
+      if ( project?.userId !== ctx.session.user.id) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
       const count = await db.layoutGroup.count({ where: { projectId: input.projectId } });

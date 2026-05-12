@@ -2,76 +2,73 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
-    output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url      = env("DATABASE_URL")
 }
-
-
 
 // Necessary for Next auth
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // @db.Text
+  access_token             String? // @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? // @db.Text
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }
+
 // ============================================
 // USUARIOS Y AUTENTICACIÓN
 // ============================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  passwordHash String?
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
   emailVerified DateTime?
   image         String?
   accounts      Account[]
   sessions      Session[]
-  role      Role     @default(INSTALLER)
-  createdAt DateTime @default(now())
+  role          Role      @default(INSTALLER)
+  createdAt     DateTime  @default(now())
 
-  catalog   Catalog?
-  projects  Project[]
-  clients   Client[]
+  catalog  Catalog?
+  projects Project[]
+  clients  Client[]
 }
 
 enum Role {
@@ -84,9 +81,14 @@ enum Role {
 // ============================================
 
 model Catalog {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  id     String  @id @default(cuid())
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  // Catálogo "global" de templates (uno por instalación). Sus items
+  // tienen isTemplate=true y sirven como fuente para que cada usuario
+  // copie a su propio catálogo desde /dashboard/catalog/import.
+  isGlobal Boolean @default(false)
 
   elementTypes     ElementType[]
   materials        Material[]
@@ -94,7 +96,7 @@ model Catalog {
   surfaceFinishes  SurfaceFinish[]
   edgeTreatments   EdgeTreatment[]
   assemblySupplies AssemblySupply[]
-  finishes         Finish[]        // Acabados de obra
+  finishes         Finish[] // Acabados de obra
 }
 
 // ============================================
@@ -102,14 +104,14 @@ model Catalog {
 // ============================================
 
 model ElementType {
-  id          String   @id @default(cuid())
-  catalogId   String
-  catalog     Catalog  @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name        String          // "Mueble Bajo", "Mueble Alto", "Mesón"
-  category    ElementCategory
-  unit        PricingUnit     // POR_ML, POR_M2, POR_UNIDAD
-  basePrice   Decimal         @db.Decimal(10, 2)
+  name      String // "Mueble Bajo", "Mueble Alto", "Mesón"
+  category  ElementCategory
+  unit      PricingUnit // POR_ML, POR_M2, POR_UNIDAD
+  basePrice Decimal         @db.Decimal(10, 2)
 
   // Dimensiones por defecto (cm)
   defaultWidth  Float?
@@ -117,7 +119,7 @@ model ElementType {
   defaultDepth  Float?
 
   // Referencia al modelo Three.js
-  threeJsModel  String   // e.g. "LowerCabinet", "UpperCabinet"
+  threeJsModel String // e.g. "LowerCabinet", "UpperCabinet"
 
   // Opciones permitidas
   allowCustomWidth  Boolean @default(true)
@@ -128,6 +130,14 @@ model ElementType {
   componentTemplates ComponentTemplate[]
 
   quoteItems QuoteItem[]
+
+  // ── Catálogo global de templates ────────────────────────────────────────
+  // isTemplate=true => fila vive en el catálogo global (Catalog.isGlobal)
+  // sourceId       => referencia al template original cuando esto es una copia
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum ElementCategory {
@@ -143,9 +153,9 @@ enum ElementCategory {
 }
 
 enum PricingUnit {
-  POR_ML        // metros lineales
-  POR_M2        // metros cuadrados
-  POR_UNIDAD    // por unidad
+  POR_ML // metros lineales
+  POR_M2 // metros cuadrados
+  POR_UNIDAD // por unidad
 }
 
 // ============================================
@@ -153,25 +163,30 @@ enum PricingUnit {
 // ============================================
 
 model Material {
-  id          String  @id @default(cuid())
-  catalogId   String
-  catalog     Catalog @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
   name        String
   category    MaterialCategory
-  pricePerM2  Decimal  @db.Decimal(10, 2)  // Precio por m² del tablero
-  thicknessMM Int      @default(18)         // Espesor estándar
+  pricePerM2  Decimal          @db.Decimal(10, 2) // Precio por m² del tablero
+  thicknessMM Int              @default(18) // Espesor estándar
 
   // Texturas para visor 3D
-  textureUrl      String?
-  roughnessMap    String?
-  normalMap       String?
-  color           String?  // hex fallback
-  aiDescription   String?  // para prompt de IA
+  textureUrl    String?
+  roughnessMap  String?
+  normalMap     String?
+  color         String? // hex fallback
+  aiDescription String? // para prompt de IA
 
-  isActive    Boolean @default(true)
+  isActive Boolean @default(true)
 
   quoteItemComponents QuoteItemComponent[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum MaterialCategory {
@@ -192,23 +207,28 @@ enum MaterialCategory {
 // ============================================
 
 model Hardware {
-  id          String          @id @default(cuid())
-  catalogId   String
-  catalog     Catalog         @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name        String          // "Bisagra hidráulica Blum"
+  name        String // "Bisagra hidráulica Blum"
   category    HardwareCategory
   qualityTier QualityTier
   brand       String?
 
-  pricePerUnit Decimal        @db.Decimal(10, 2)
-  unit         String         @default("und")  // und, par, juego
+  pricePerUnit Decimal @db.Decimal(10, 2)
+  unit         String  @default("und") // und, par, juego
 
-  description  String?
-  imageUrl     String?
-  threeDModel  String?        // Modelo 3D para visualización
+  description String?
+  imageUrl    String?
+  threeDModel String? // Modelo 3D para visualización
 
   hardwareItems HardwareItem[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum HardwareCategory {
@@ -236,23 +256,28 @@ enum QualityTier {
 // ============================================
 
 model SurfaceFinish {
-  id          String            @id @default(cuid())
-  catalogId   String
-  catalog     Catalog           @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name        String            // "Lacado blanco mate"
-  type        SurfaceFinishType
-  pricePerM2  Decimal           @db.Decimal(10, 2)
+  name       String // "Lacado blanco mate"
+  type       SurfaceFinishType
+  pricePerM2 Decimal           @db.Decimal(10, 2)
 
   textureUrl    String?
   roughnessMap  String?
   normalMap     String?
-  color         String?         // hex fallback
-  aiDescription String?         // para IA
+  color         String? // hex fallback
+  aiDescription String? // para IA
 
-  isActive    Boolean           @default(true)
+  isActive Boolean @default(true)
 
   quoteItemComponents QuoteItemComponent[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum SurfaceFinishType {
@@ -270,18 +295,23 @@ enum SurfaceFinishType {
 // ============================================
 
 model EdgeTreatment {
-  id          String    @id @default(cuid())
-  catalogId   String
-  catalog     Catalog   @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name        String    // "Canto PVC 2mm", "Chaflan 45°"
+  name        String // "Canto PVC 2mm", "Chaflan 45°"
   type        EdgeType
-  pricePerML  Decimal   @db.Decimal(10, 2)  // precio por metro lineal
-  thicknessMM Int?      // espesor del canto
+  pricePerML  Decimal  @db.Decimal(10, 2) // precio por metro lineal
+  thicknessMM Int? // espesor del canto
 
   description String?
 
   componentEdges ComponentEdge[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum EdgeType {
@@ -300,18 +330,23 @@ enum EdgeType {
 // ============================================
 
 model AssemblySupply {
-  id           String        @id @default(cuid())
-  catalogId    String
-  catalog      Catalog       @relation(fields: [catalogId], references: [id])
+  id        String  @id @default(cuid())
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name         String        // "Tornillo Confirmat 7×50"
+  name         String // "Tornillo Confirmat 7×50"
   category     SupplyCategory
-  unit         String        // und, ml, kg, m
-  pricePerUnit Decimal       @db.Decimal(10, 2)
+  unit         String // und, ml, kg, m
+  pricePerUnit Decimal        @db.Decimal(10, 2)
 
-  autoCalcRule String?       // "8_PER_PANEL" | "0.15L_PER_M2"
+  autoCalcRule String? // "8_PER_PANEL" | "0.15L_PER_M2"
 
   quoteItemSupplies QuoteItemSupply[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 enum SupplyCategory {
@@ -334,11 +369,16 @@ model Finish {
   catalogId String
   catalog   Catalog @relation(fields: [catalogId], references: [id])
 
-  name        String      // "Estucado y pintura", "Instalación de piso"
-  pricePerM2  Decimal     @db.Decimal(10, 2)
-  unit        String      @default("m²")
+  name       String // "Estucado y pintura", "Instalación de piso"
+  pricePerM2 Decimal @db.Decimal(10, 2)
+  unit       String  @default("m²")
 
   projectFinishes ProjectFinish[]
+
+  isTemplate Boolean @default(false)
+  sourceId   String?
+
+  @@index([sourceId])
 }
 
 // ============================================
@@ -346,21 +386,21 @@ model Finish {
 // ============================================
 
 model ComponentTemplate {
-  id            String        @id @default(cuid())
+  id            String      @id @default(cuid())
   elementTypeId String
-  elementType   ElementType   @relation(fields: [elementTypeId], references: [id])
+  elementType   ElementType @relation(fields: [elementTypeId], references: [id])
 
   componentType ComponentType
-  label         String?       // "Lateral izquierdo"
+  label         String? // "Lateral izquierdo"
 
   // Fórmulas relativas a dimensiones del mueble (W, H, D en cm)
-  widthFormula     String    // "W" o "W - 3.6"
-  heightFormula    String    // "H - 3.6"
-  thicknessMM      Int       @default(18)
-  depthFormula     String    @default("D")
+  widthFormula  String // "W" o "W - 3.6"
+  heightFormula String // "H - 3.6"
+  thicknessMM   Int    @default(18)
+  depthFormula  String @default("D")
 
-  quantity         Int       @default(1)
-  sortOrder        Int       @default(0)
+  quantity  Int @default(1)
+  sortOrder Int @default(0)
 
   // Qué aristas llevan canto visible
   topEdge    Boolean @default(false)
@@ -369,8 +409,8 @@ model ComponentTemplate {
   rightEdge  Boolean @default(false)
 
   // Sugerencias por defecto
-  defaultMaterialCategory     MaterialCategory?
-  defaultSurfaceFinishType    SurfaceFinishType?
+  defaultMaterialCategory  MaterialCategory?
+  defaultSurfaceFinishType SurfaceFinishType?
 }
 
 enum ComponentType {
@@ -393,39 +433,39 @@ enum ComponentType {
 // ============================================
 
 model Client {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  name      String
-  email     String?
-  phone     String?
-  address   String?
+  name    String
+  email   String?
+  phone   String?
+  address String?
 
   projects  Project[]
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model Project {
-  id        String        @id @default(cuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  clientId  String
-  client    Client        @relation(fields: [clientId], references: [id])
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
 
-  name      String
-  status    ProjectStatus @default(DRAFT)
+  name   String
+  status ProjectStatus @default(DRAFT)
 
   // Dimensiones del espacio (cm)
   roomWidth  Float?
   roomLength Float?
   roomHeight Float?
 
-  notes     String?
+  notes String?
 
   // Portal del cliente
-  shareToken   String   @unique @default(cuid())
-  shareExpiry  DateTime?
+  shareToken  String    @unique @default(cuid())
+  shareExpiry DateTime?
 
   // Imágenes
   referenceImageUrl String?
@@ -437,9 +477,9 @@ model Project {
   layoutGroups    LayoutGroup[]
 
   // Totales
-  subtotal  Decimal @db.Decimal(10, 2) @default(0)
-  tax       Decimal @db.Decimal(10, 2) @default(0)
-  total     Decimal @db.Decimal(10, 2) @default(0)
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -465,28 +505,28 @@ model QuoteItem {
   elementTypeId String
   elementType   ElementType @relation(fields: [elementTypeId], references: [id])
 
-  label     String?    // "Mueble bajo esquina", "Refrigerador"
+  label String? // "Mueble bajo esquina", "Refrigerador"
 
   // ── Grupo de layout ──────────────────────
-  layoutGroupId  String?
-  layoutGroup    LayoutGroup? @relation(fields: [layoutGroupId], references: [id])
+  layoutGroupId String?
+  layoutGroup   LayoutGroup? @relation(fields: [layoutGroupId], references: [id])
 
   // Posición dentro del grupo (ordenable por drag)
-  groupOrder     Int          @default(0)
+  groupOrder Int @default(0)
 
   // Cómo conecta ESTE item con el SIGUIENTE en la lista
   connectionToNext ConnectionType @default(INLINE)
 
   // Offset fino antes de este item (para GAP: espacio libre en cm)
   // En INLINE/CORNER este valor es un ajuste de precisión pequeño
-  gapBeforeCm  Float @default(0)
+  gapBeforeCm Float @default(0)
 
   // ── Posición absoluta (calculada, no editada a mano) ──
   // Se recalcula cada vez que cambia el grupo
   posX      Float @default(0)
-  posY      Float @default(0)   // altura desde el piso (para muebles altos)
+  posY      Float @default(0) // altura desde el piso (para muebles altos)
   posZ      Float @default(0)
-  rotationY Float @default(0)   // grados
+  rotationY Float @default(0) // grados
 
   // ── Dimensiones (cm) ──────────────────────
   width    Float
@@ -495,11 +535,11 @@ model QuoteItem {
   quantity Int   @default(1)
 
   // ── Precios ───────────────────────────────
-  unitPrice   Decimal @db.Decimal(10, 2)
-  totalPrice  Decimal @db.Decimal(10, 2)
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   notes     String?
-  sortOrder Int     @default(0)  // orden global en la cotización (lista)
+  sortOrder Int     @default(0) // orden global en la cotización (lista)
 
   components    QuoteItemComponent[]
   hardwareItems HardwareItem[]
@@ -511,19 +551,19 @@ model QuoteItem {
 // ============================================
 
 model QuoteItemComponent {
-  id            String    @id @default(cuid())
-  quoteItemId   String
-  quoteItem     QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  quoteItemId String
+  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
 
   componentType ComponentType
   label         String?
 
   // Dimensiones reales (cm)
-  widthCm    Float
-  heightCm   Float
+  widthCm     Float
+  heightCm    Float
   thicknessMM Int
 
-  quantity   Int       @default(1)
+  quantity Int @default(1)
 
   // Material del tablero
   materialId String?
@@ -534,12 +574,12 @@ model QuoteItemComponent {
   surfaceFinish   SurfaceFinish? @relation(fields: [surfaceFinishId], references: [id])
 
   // Áreas calculadas
-  boardAreaM2    Float    // para costo del tablero
-  finishAreaM2   Float    // para costo del acabado
+  boardAreaM2  Float // para costo del tablero
+  finishAreaM2 Float // para costo del acabado
 
   // Precios
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2)
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   // Cantos aplicados
   edges ComponentEdge[]
@@ -550,16 +590,16 @@ model QuoteItemComponent {
 // ============================================
 
 model ComponentEdge {
-  id               String             @id @default(cuid())
-  componentId      String
-  component        QuoteItemComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
-  edgeTreatmentId  String
-  edgeTreatment    EdgeTreatment      @relation(fields: [edgeTreatmentId], references: [id])
+  id              String             @id @default(cuid())
+  componentId     String
+  component       QuoteItemComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  edgeTreatmentId String
+  edgeTreatment   EdgeTreatment      @relation(fields: [edgeTreatmentId], references: [id])
 
-  edgeSide  EdgeSide
-  lengthML  Float        // metros lineales
-  unitPrice Decimal      @db.Decimal(10, 2)
-  totalPrice Decimal     @db.Decimal(10, 2)
+  edgeSide   EdgeSide
+  lengthML   Float // metros lineales
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  totalPrice Decimal  @db.Decimal(10, 2)
 }
 
 enum EdgeSide {
@@ -580,10 +620,10 @@ model HardwareItem {
   hardwareId  String
   hardware    Hardware  @relation(fields: [hardwareId], references: [id])
 
-  quantity    Int
-  unitPrice   Decimal   @db.Decimal(10, 2)
-  totalPrice  Decimal   @db.Decimal(10, 2)
-  notes       String?
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes      String?
 }
 
 // ============================================
@@ -614,10 +654,10 @@ model ProjectFinish {
   finishId  String
   finish    Finish  @relation(fields: [finishId], references: [id])
 
-  areaM2      Float
-  unitPrice   Decimal @db.Decimal(10, 2)
-  totalPrice  Decimal @db.Decimal(10, 2)
-  notes       String?
+  areaM2     Float
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+  notes      String?
 }
 
 // ============================================
@@ -629,13 +669,13 @@ model LayoutGroup {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  name      String       // "Pared norte", "Isla central", "Módulo esquina"
-  type      GroupType
+  name String // "Pared norte", "Isla central", "Módulo esquina"
+  type GroupType
 
   // Punto de inicio del grupo en el plano de planta (cm)
   // Origen = esquina suroeste del espacio
-  startX    Float @default(0)
-  startY    Float @default(0)  // Y en plano 2D = Z en espacio 3D
+  startX Float @default(0)
+  startY Float @default(0) // Y en plano 2D = Z en espacio 3D
 
   // Ángulo inicial del grupo (0° = hacia este, 90° = hacia norte)
   baseAngle Float @default(0)
@@ -646,20 +686,20 @@ model LayoutGroup {
 }
 
 enum GroupType {
-  WALL_RUN    // línea recta de muebles pegados a una pared
-  ISLAND      // isla central, libre de paredes
-  PENINSULA   // conectada a pared por un extremo
-  L_SHAPE     // dos tramos en L (el giro se maneja con CORNER_90)
-  U_SHAPE     // tres tramos en U
-  STANDALONE  // elemento individual sin grupo
+  WALL_RUN // línea recta de muebles pegados a una pared
+  ISLAND // isla central, libre de paredes
+  PENINSULA // conectada a pared por un extremo
+  L_SHAPE // dos tramos en L (el giro se maneja con CORNER_90)
+  U_SHAPE // tres tramos en U
+  STANDALONE // elemento individual sin grupo
 }
 
 // ConnectionType define cómo este item conecta con el SIGUIENTE en el grupo
 enum ConnectionType {
-  INLINE       // continúa en la misma dirección, sin separación
-  CORNER_90R   // gira 90° a la derecha (sentido horario)
-  CORNER_90L   // gira 90° a la izquierda
-  CORNER_45    // giro de 45° (mueble esquina octogonal)
-  GAP          // hay espacio libre antes del siguiente (ventana, campana)
-  END          // último item del grupo
+  INLINE // continúa en la misma dirección, sin separación
+  CORNER_90R // gira 90° a la derecha (sentido horario)
+  CORNER_90L // gira 90° a la izquierda
+  CORNER_45 // giro de 45° (mueble esquina octogonal)
+  GAP // hay espacio libre antes del siguiente (ventana, campana)
+  END // último item del grupo
 }

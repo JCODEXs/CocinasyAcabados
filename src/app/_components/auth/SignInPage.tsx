@@ -71,8 +71,8 @@ export function SignInPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-3xl shadow-lg">
             <img src="/logo.png" alt="Logo" className="h-16 w-auto mx-auto rounded-xl" />
           </div>
-          <h1 className="text-2xl font-black text-white">Inventario</h1>
-          <p className="text-sm text-gray-500">Prestamos y control de inventario</p>
+          <h1 className="text-2xl font-black text-white">Cocinas y acabados</h1>
+          <p className="text-sm text-gray-500">Cotiza y construye</p>
         </div>
 
         {/* Error */}
@@ -162,7 +162,7 @@ export function SignInPage() {
 
         <p className="mt-4 text-center text-sm text-gray-600">
           ¿Sin cuenta?{" "}
-          <Link href="/auth/register" className="text-amber-400 hover:text-amber-300 font-semibold">
+          <Link href="/register" className="text-amber-400 hover:text-amber-300 font-semibold">
             Regístrate aquí
           </Link>
         </p>

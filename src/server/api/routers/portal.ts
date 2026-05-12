@@ -6,37 +6,71 @@ import { db } from "@/server/db";
 // Router público: no requiere autenticación, solo el shareToken
 export const portalRouter = createTRPCRouter({
 
-  getByToken: publicProcedure
-    .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
-      const project = await db.project.findUnique({
-        where: { shareToken: input.token },
-        include: {
-          client: { select: { name: true } },
-          layoutGroups: {
-            include: {
-              items: {
-                orderBy: { groupOrder: "asc" },
-                include: {
-                  elementType: { select: { name: true, threeJsModel: true } },
-                  components: {
-                    include: {
-                      material: { select: { name: true, color: true, textureUrl: true, aiDescription: true } },
-                      surfaceFinish: { select: { name: true, color: true, textureUrl: true, aiDescription: true } },
-                      edges: { include: { edgeTreatment: { select: { name: true, type: true } } } },
+getByToken: publicProcedure
+  .input(z.object({ token: z.string() }))
+  .query(async ({ input }) => {
+    const project = await db.project.findUnique({
+      where: { shareToken: input.token },
+      include: {
+        client: { select: { name: true } },
+        layoutGroups: {
+          include: {
+            items: {
+              orderBy: { groupOrder: "asc" },
+              include: {
+                elementType: { select: { name: true, threeJsModel: true, category:true } },
+                components: {
+                  include: {
+                    material: { 
+                      select: { 
+                        id: true, 
+                        name: true, 
+                        color: true, 
+                        textureUrl: true, 
+                        aiDescription: true 
+                      } 
+                    },
+                    surfaceFinish: { 
+                      select: { 
+                        id: true, 
+                        name: true, 
+                        color: true, 
+                        textureUrl: true, 
+                        aiDescription: true 
+                      } 
+                    },
+                    edges: { 
+                      include: { 
+                        edgeTreatment: { 
+                          select: { 
+                            name: true, 
+                            type: true 
+                          } 
+                        } 
+                      } 
                     },
                   },
-                  hardwareItems: {
-                    include: { hardware: { select: { name: true, category: true, qualityTier: true, imageUrl: true } } },
+                },
+                hardwareItems: {
+                  include: { 
+                    hardware: { 
+                      select: { 
+                        id: true,
+                        name: true, 
+                        category: true, 
+                        qualityTier: true, 
+                        imageUrl: true 
+                      } 
+                    } 
                   },
                 },
               },
             },
           },
-          projectFinishes: { include: { finish: { select: { name: true } } } },
         },
-      });
-
+        projectFinishes: { include: { finish: { select: { name: true } } } },
+      },
+    });
       if (!project) throw new TRPCError({ code: "NOT_FOUND", message: "Cotización no encontrada." });
 
       // Verificar expiración
@@ -59,7 +93,11 @@ export const portalRouter = createTRPCRouter({
         subtotal: project.subtotal,
         total: project.total,
       };
-    }),
+    
+  }),
+
+    
+  
 
   // El cliente envía sus preferencias de materiales por componente
   submitClientPreferences: publicProcedure

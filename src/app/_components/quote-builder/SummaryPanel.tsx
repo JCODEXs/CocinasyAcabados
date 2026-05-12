@@ -6,7 +6,7 @@ import { type RouterOutputs } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
 import {
   ChevronDownIcon, ChevronRightIcon, PlusIcon,
-  TrashIcon, ShareIcon, DocumentArrowDownIcon,
+   ShareIcon, DocumentArrowDownIcon,
   CheckCircleIcon, ClockIcon,
 } from "@heroicons/react/24/outline";
 
@@ -20,11 +20,12 @@ const COP = (n: number) =>
 
 // ─── Panel principal ──────────────────────────────────────────────────────────
 
-export function SummaryPanel({ project, catalog }: { project: Project; catalog: Catalog }) {
-  const { invalidate } = useQuoteBuilder();
+export function SummaryPanel() {
+  const { project, catalog, invalidateProject } = useQuoteBuilder();
+  if (!project || !catalog) return null;
   const [tab, setTab] = useState<"items" | "finishes" | "export">("items");
 
-  const updateStatus = api.quotes.updateProjectStatus.useMutation({ onSuccess: invalidate });
+  const updateStatus = api.quotes.updateProjectStatus.useMutation({ onSuccess: invalidateProject });
 
   const canSend = project.status === "DRAFT" && Number(project.total) > 0;
 
@@ -153,6 +154,7 @@ function GroupSummaryRow({
   items: Project["layoutGroups"][number]["items"];
 }) {
   const [open, setOpen] = useState(true);
+  console.log("grupsummaryRow", items)
 
   return (
     <div>
@@ -181,11 +183,53 @@ function GroupSummaryRow({
   );
 }
 
+// function groupByType<T extends { name: string; unitPrice: any; quantity?: number; totalPrice: any }>(items: T[]) {
+//   const map = new Map<string, {
+//     name: string;
+//     quantity: number;
+//     unitPrice: number;
+//     total: number;
+//   }>();
+
+//   for (const item of items) {
+//     const key = item.name;
+
+//     const unitPrice = Number(item.unitPrice ?? 0);
+//     const total = Number(item.totalPrice ?? 0);
+//     const quantity = item.quantity ?? 1;
+
+//     if (!map.has(key)) {
+//       map.set(key, {
+//         name: key,
+//         quantity: 0,
+//         unitPrice,
+//         total: 0,
+//       });
+//     }
+
+//     const acc = map.get(key)!;
+//     acc.quantity += quantity;
+//     acc.total += total;
+//   }
+
+//   return Array.from(map.values());
+// }
+
 function ItemSummaryRow({ item }: { item: Project["layoutGroups"][number]["items"][number] }) {
   const [open, setOpen] = useState(false);
 
+  // const components = groupByType(item.components);
+const hardware = item.hardwareItems.map(h => ({
+  id: h.id,
+  name: h.hardware.name,
+  quantity: h.quantity,
+  unitPrice: Number(h.unitPrice),
+  total: Number(h.totalPrice),
+}));
+// const supplies = groupByType(item.supplies);
+
   const componentTotal = item.components.reduce((s, c) => s + Number(c.totalPrice), 0);
-  const hardwareTotal  = item.hardwareItems.reduce((s, h) => s + Number(h.totalPrice), 0);
+  // const hardwareTotal  = item.hardwareItems.reduce((s, h) => s + Number(h.totalPrice), 0);
   const supplyTotal    = item.supplies.reduce((s, x) => s + Number(x.totalPrice), 0);
 
   return (
@@ -211,9 +255,9 @@ function ItemSummaryRow({ item }: { item: Project["layoutGroups"][number]["items
           {componentTotal > 0 && (
             <SubRow label="Tableros + acabados" value={componentTotal} />
           )}
-          {hardwareTotal > 0 && (
-            <SubRow label="Herrajes" value={hardwareTotal} />
-          )}
+          {hardware.map(h => (
+          <DetailRow key={h.name} item={h} />
+        ))}
           {supplyTotal > 0 && (
             <SubRow label="Insumos ensamble" value={supplyTotal} />
           )}
@@ -222,6 +266,26 @@ function ItemSummaryRow({ item }: { item: Project["layoutGroups"][number]["items
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function DetailRow({
+  item,
+}: {
+  item: { name: string; quantity: number; unitPrice: number; total: number };
+}) {
+  console.log(item,"item detailedROw")
+  return (
+    <div className="flex justify-between py-0.5 text-xs">
+      <div className="flex flex-col">
+        <span className="text-gray-600">{item.name}</span>
+        <span className="text-gray-400">
+          {item.quantity} × {COP(item.unitPrice)}
+        </span>
+      </div>
+      <span className="text-gray-700">{COP(item.total)}</span>
     </div>
   );
 }
@@ -328,11 +392,12 @@ function FinishRow({ pf, projectId, onSaved }: {
   projectId: string;
   onSaved: () => void;
 }) {
-  const { invalidate } = useQuoteBuilder();
+  // const { invalidate } = useQuoteBuilder();
   const [editingArea, setEditingArea] = useState(false);
   const [areaVal, setAreaVal] = useState(String(pf.areaM2));
 
-  const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, { staleTime: 300_000 });
+  // const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, {staleTime: 10 * 60 * 1000,
+  // gcTime:    30 * 60 * 1000,});
   const upsert = api.quotes.upsertProjectFinish.useMutation({ onSuccess: () => { setEditingArea(false); onSaved(); } });
 
   const commitArea = () => {
@@ -486,7 +551,7 @@ function ExportCard({ title, description, status, onAction, actionLabel, resultL
             )}
             {status === "done" && (
               resultHref ? (
-                
+                <a
                   href={resultHref}
                   target="_blank"
                   rel="noopener noreferrer"

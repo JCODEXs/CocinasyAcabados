@@ -83,6 +83,27 @@ export function FloorPlanView({ project }: Props) {
 
   // ─── Handlers de interacción ──────────────────────────────────────────────
 
+  //Snapping a grilla. Cuando arrastras un grupo, es útil que haga snap a múltiplos de 5cm.
+// const snapCm = (v: number, grid = 5) => Math.round(v / grid) * grid;
+// const newStartX = snapCm((drag.origStartX ?? 0) + pxToCm(dx));
+// const newStartY = snapCm((drag.origStartY ?? 0) + pxToCm(dy));
+
+//fitRoom
+// const fitToRoom = useCallback(() => {
+//   const el = svgRef.current;
+//   if (!el) return;
+//   const { width, height } = el.getBoundingClientRect();
+//   const zoomW = (width  - 80) / (roomW * BASE_SCALE);
+//   const zoomH = (height - 80) / (roomL * BASE_SCALE);
+//   const newZoom = Math.min(zoomW, zoomH, MAX_ZOOM);
+//   const totalW  = roomW * BASE_SCALE * newZoom + WALL_PX * 2;
+//   const totalH  = roomL * BASE_SCALE * newZoom + WALL_PX * 2;
+//   setView({
+//     zoom: newZoom,
+//     panX: (width  - totalW) / 2,
+//     panY: (height - totalH) / 2,
+//   });
+// }, [roomW, roomL]);
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.12 : 0.89;
@@ -369,10 +390,23 @@ function GroupLayer({ group, gIdx, tx, tz, s, pxToCm, drag, selectedItemId,
 }) {
   const [fill, stroke] = GROUP_PALETTE[gIdx % GROUP_PALETTE.length]!;
 
+  function expandItems(items: QuoteItem[]) {
+  return items.flatMap(item =>
+    Array.from({ length: item.quantity }).map((_, i) => ({
+      ...item,
+      instanceId: `${item.id}-${i}`,
+      // id= `${item.id}-${i}`,
+      posX: item.posX + i * (item.width + (item.gapBeforeCm ?? 0)),
+    }))
+  );
+}
+
   // Si este grupo está siendo arrastrado, aplicar desplazamiento visual
   const isDraggingThis = drag?.type === "group" && drag.groupId === group.id;
+  
 
-  const items = group.items;
+  // const items = group.items;
+const items = expandItems(group.items);
 
   return (
     <g>

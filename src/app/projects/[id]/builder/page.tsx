@@ -1,20 +1,30 @@
-import { api } from "@/trpc/server";
-import { notFound } from "next/navigation";
+import { api }               from "@/trpc/server";
+import { notFound }          from "next/navigation";
+import { serializeDecimals } from "@/server/lib/serialize";
 import { QuoteBuilderProvider } from "@/app/_components/quote-builder/context";
-import { QuoteBuilderShell } from "@/app/_components/quote-builder/QuoteBuilderShell";
+import { QuoteBuilderShell }    from "@/app/_components/quote-builder/QuoteBuilderShell";
 
-export default async function BuilderPage({ params }: { params: Promise<{ id: string }> }) {
-  // Prefetch server-side para evitar loading flash
-  const id = await params.id
-  console.log(id)
-  const project = await api.quotes.getProject({ id }).catch(() => null);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function BuilderPage({ params }: PageProps) {
+  const { id } = await params;
+
+  const [project, catalog] = await Promise.all([
+    api.quotes.getProject({ id }).catch(() => null),
+    api.catalog.getFullCatalog().catch(() => null),
+  ]);
+
   if (!project) notFound();
 
-  const catalog = await api.catalog.getFullCatalog();
-
   return (
-    <QuoteBuilderProvider projectId={id}>
-      <QuoteBuilderShell initialProject={project} initialCatalog={catalog} />
+    <QuoteBuilderProvider
+      projectId={id}
+      initialProject={serializeDecimals(project)}
+      initialCatalog={serializeDecimals(catalog)}
+    >
+      <QuoteBuilderShell />
     </QuoteBuilderProvider>
   );
 }

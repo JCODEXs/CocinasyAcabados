@@ -1,10 +1,11 @@
+
 "use client";
 
-import { api } from "@/trpc/react";
-import { type RouterOutputs } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
+import { useOptimisticComponent } from "./ui/hooks/useOptimisticComponent";
 import { MaterialSwatch } from "./ui/MaterialSwatch";
-import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import { api } from "@/trpc/react";
+import type { RouterOutputs } from "@/trpc/react";
 
 type Component = RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number]["components"][number];
 
@@ -16,19 +17,34 @@ const COMPONENT_LABELS: Record<string, string> = {
 };
 
 export function ComponentEditor({ component }: { component: Component }) {
-  const { invalidate } = useQuoteBuilder();
+  const { catalog, refetchProject } = useQuoteBuilder();
+  const { updateComponent, isPending } = useOptimisticComponent(component.id);
 
-  const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-  });
+  // component prop comes from cache — always up to date after optimistic update
+  // No local state needed for materialId or surfaceFinishId
 
-  const updateComponent = api.quotes.updateComponent.useMutation({ onSuccess: invalidate });
+  // Resolve display objects from catalog using IDs from cache
+  const displayMaterial      = catalog?.materials.find(m => m.id === component.materialId);
+  const displaySurfaceFinish = catalog?.surfaceFinishes.find(f => f.id === component.surfaceFinishId);
 
-  const areaM2 = component.boardAreaM2;
+  const handleMaterialChange = (materialId: string | null) => {
+    updateComponent({
+      componentId:     component.id,
+      materialId,
+      surfaceFinishId: component.surfaceFinishId,
+    });
+  };
+
+  const handleFinishChange = (surfaceFinishId: string | null) => {
+    updateComponent({
+      componentId: component.id,
+      materialId:  component.materialId,
+      surfaceFinishId,
+    });
+  };
 
   return (
     <div className="rounded-md border border-gray-100 p-2.5 dark:border-gray-800">
-      {/* Header del componente */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -42,32 +58,30 @@ export function ComponentEditor({ component }: { component: Component }) {
               ×{component.quantity}
             </span>
           )}
+          {/* Pending indicator — dot instead of spinner to not distract */}
+          {isPending && (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" title="Guardando..." />
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400">
           <span>{component.widthCm.toFixed(1)} × {component.heightCm.toFixed(1)} cm</span>
-          <span>{areaM2.toFixed(3)} m²</span>
-          <span className="font-medium text-gray-700 dark:text-gray-300">
-            ${Number(component.totalPrice).toLocaleString("es-CO")}
-          </span>
+          <span className="text-gray-300">{component.boardAreaM2.toFixed(3)} m²</span>
         </div>
       </div>
 
-      {/* Selección de material y acabado */}
       <div className="grid grid-cols-2 gap-2">
-        {/* Material del tablero */}
         <div>
           <p className="mb-1 text-xs text-gray-400">Tablero</p>
           <div className="flex items-center gap-1.5">
-            {component.material && (
-              <MaterialSwatch color={component.material.color} textureUrl={component.material.textureUrl} size="sm" />
-            )}
+            {/* Swatch reads from cache — updates immediately after onMutate */}
+            <MaterialSwatch
+              color={displayMaterial?.color ?? null}
+              textureUrl={displayMaterial?.textureUrl ?? null}
+              size="sm"
+            />
             <select
               value={component.materialId ?? ""}
-              onChange={e => updateComponent.mutate({
-                componentId: component.id,
-                materialId: e.target.value || null,
-                surfaceFinishId: component.surfaceFinishId,
-              })}
+              onChange={e => handleMaterialChange(e.target.value || null)}
               className="flex-1 rounded border border-gray-200 bg-white py-1 pl-2 pr-6 text-xs text-gray-700 focus:border-gray-400 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">— Sin material —</option>
@@ -80,20 +94,17 @@ export function ComponentEditor({ component }: { component: Component }) {
           </div>
         </div>
 
-        {/* Acabado superficial */}
         <div>
           <p className="mb-1 text-xs text-gray-400">Acabado</p>
           <div className="flex items-center gap-1.5">
-            {component.surfaceFinish && (
-              <MaterialSwatch color={component.surfaceFinish.color} textureUrl={component.surfaceFinish.textureUrl} size="sm" />
-            )}
+            <MaterialSwatch
+              color={displaySurfaceFinish?.color ?? null}
+              textureUrl={displaySurfaceFinish?.textureUrl ?? null}
+              size="sm"
+            />
             <select
               value={component.surfaceFinishId ?? ""}
-              onChange={e => updateComponent.mutate({
-                componentId: component.id,
-                materialId: component.materialId,
-                surfaceFinishId: e.target.value || null,
-              })}
+              onChange={e => handleFinishChange(e.target.value || null)}
               className="flex-1 rounded border border-gray-200 bg-white py-1 pl-2 pr-6 text-xs text-gray-700 focus:border-gray-400 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="">— Sin acabado —</option>
@@ -107,11 +118,10 @@ export function ComponentEditor({ component }: { component: Component }) {
         </div>
       </div>
 
-      {/* Cantos */}
       {component.edges.length > 0 && (
         <div className="mt-2 space-y-1">
           {component.edges.map(edge => (
-            <EdgeRow key={edge.id} edge={edge} catalog={catalog} />
+            <EdgeRow key={edge.id} edge={edge} />
           ))}
         </div>
       )}
@@ -119,12 +129,46 @@ export function ComponentEditor({ component }: { component: Component }) {
   );
 }
 
-function EdgeRow({ edge, catalog }: {
-  edge: Component["edges"][number];
-  catalog: RouterOutputs["catalog"]["getFullCatalog"] | undefined;
+function EdgeRow({ edge }: {
+  edge: RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number]["components"][number]["edges"][number];
 }) {
-  const { invalidate } = useQuoteBuilder();
-  const updateEdge = api.quotes.updateEdge.useMutation({ onSuccess: invalidate });
+  const { catalog, projectId, refetchProject } = useQuoteBuilder();
+  const utils = api.useUtils();
+
+  const updateEdge = api.quotes.updateEdge.useMutation({
+    onMutate: async (variables) => {
+      await utils.quotes.getProject.cancel({ id: projectId });
+      const snapshot = utils.quotes.getProject.getData({ id: projectId });
+
+      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          layoutGroups: old.layoutGroups.map(g => ({
+            ...g,
+            items: g.items.map(item => ({
+              ...item,
+              components: item.components.map(comp => ({
+                ...comp,
+                edges: comp.edges.map(e =>
+                  e.id !== edge.id ? e : {
+                    ...e,
+                    edgeTreatmentId: variables.edgeTreatmentId,
+                  }
+                ),
+              })),
+            })),
+          })),
+        };
+      });
+
+      return { snapshot };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.snapshot) utils.quotes.getProject.setData({ id: projectId }, ctx.snapshot);
+    },
+    onSettled: refetchProject,
+  });
 
   const sideLabel: Record<string, string> = {
     TOP: "Sup.", BOTTOM: "Inf.", LEFT: "Izq.", RIGHT: "Der."
@@ -143,7 +187,9 @@ function EdgeRow({ edge, catalog }: {
           <option key={et.id} value={et.id}>{et.name}</option>
         ))}
       </select>
-      <span className="shrink-0 text-gray-500">${Number(edge.totalPrice).toLocaleString("es-CO")}</span>
+      <span className="shrink-0 text-gray-500">
+        ${Number(edge.totalPrice).toLocaleString("es-CO")}
+      </span>
     </div>
   );
 }

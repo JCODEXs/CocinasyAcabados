@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { ElementCategory, PricingUnit, MaterialCategory, HardwareCategory,QualityTier, SurfaceFinishType, EdgeType, SupplyCategory, ComponentType } from "@prisma/client";
+import { ElementCategory, PricingUnit, MaterialCategory, HardwareCategory, QualityTier, SurfaceFinishType, EdgeType, SupplyCategory, ComponentType } from "@prisma/client";
 import { db } from "@/server/db";
 
 // Helper para obtener o crear catálogo del usuario
@@ -12,31 +13,89 @@ async function getOrCreateCatalog(userId: string) {
   });
 }
 
+// ── Schemas reutilizables ──────────────────────────────────────────────────────
+// Acepta string | null | undefined (Prisma devuelve null para opcionales) y
+// normaliza "" / null a undefined para no pisar valores en DB.
+const optStr = z
+  .string()
+  .nullish()
+  .transform((v) => (v == null || v === "" ? undefined : v));
+
+const optUrl = z
+  .string()
+  .url()
+  .or(z.literal(""))
+  .nullish()
+  .transform((v) => (v == null || v === "" ? undefined : v));
+
+const optHexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .or(z.literal(""))
+  .nullish()
+  .transform((v) => (v == null || v === "" ? undefined : v));
+
+// Verifica que la fila exista en el catálogo del usuario y no sea template.
+type OwnedModel = {
+  findUnique: (args: { where: { id: string }; select: { catalogId: true; isTemplate: true } }) => Promise<
+    { catalogId: string; isTemplate: boolean } | null
+  >;
+};
+async function assertOwnedById(model: OwnedModel, id: string, catalogId: string) {
+  const row = await model.findUnique({
+    where: { id },
+    select: { catalogId: true, isTemplate: true },
+  });
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Item no encontrado." });
+  if (row.isTemplate || row.catalogId !== catalogId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Sin acceso a este item." });
+  }
+}
+
 export const catalogRouter = createTRPCRouter({
 
   // ── Catálogo completo de una vez ────────────────────────────────────────────
-
-  getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
-    const catalog = await getOrCreateCatalog(ctx.session.user.id);
-    return db.catalog.findUniqueOrThrow({
-      where: { id: catalog.id },
-      include: {
-        elementTypes: { include: { componentTemplates: { orderBy: { sortOrder: "asc" } } } },
-        materials: { where: { isActive: true }, orderBy: { name: "asc" } },
-        hardware: { orderBy: [{ category: "asc" }, { qualityTier: "asc" }] },
-        surfaceFinishes: { where: { isActive: true }, orderBy: { name: "asc" } },
-        edgeTreatments: { orderBy: { name: "asc" } },
-        assemblySupplies: { orderBy: { category: "asc" } },
-        finishes: { orderBy: { name: "asc" } },
+getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
+  // Single transaction: find-or-create + fetch all in one roundtrip
+  const catalog = await db.catalog.upsert({
+    where:  { userId: ctx.session.user.id },
+    create: { userId: ctx.session.user.id },
+    update: {},
+    include: {
+      elementTypes: {
+        include: { componentTemplates: { orderBy: { sortOrder: "asc" } } },
       },
-    });
-  }),
+      materials:        { where: { isActive: true }, orderBy: { name: "asc" } },
+      hardware:         { orderBy: [{ category: "asc" }, { qualityTier: "asc" }] },
+      surfaceFinishes:  { where: { isActive: true }, orderBy: { name: "asc" } },
+      edgeTreatments:  { orderBy: { name: "asc" } },
+      assemblySupplies:{ orderBy: { category: "asc" } },
+      finishes:        { orderBy: { name: "asc" } },
+    },
+  });
+  return catalog;
+}),
+  // getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
+  //   const catalog = await getOrCreateCatalog(ctx.session.user.id);
+  //   return db.catalog.findUniqueOrThrow({
+  //     where: { id: catalog.id },
+  //     include: {
+  //       elementTypes: { include: { componentTemplates: { orderBy: { sortOrder: "asc" } } } },
+  //       materials: { where: { isActive: true }, orderBy: { name: "asc" } },
+  //       hardware: { orderBy: [{ category: "asc" }, { qualityTier: "asc" }] },
+  //       surfaceFinishes: { where: { isActive: true }, orderBy: { name: "asc" } },
+  //       edgeTreatments: { orderBy: { name: "asc" } },
+  //       assemblySupplies: { orderBy: { category: "asc" } },
+  //       finishes: { orderBy: { name: "asc" } },
+  //     },
+  //   });
+  // }),
 
   // ── ElementType ─────────────────────────────────────────────────────────────
 
   upsertElementType: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       category: z.nativeEnum(ElementCategory),
       unit: z.nativeEnum(PricingUnit),
@@ -53,20 +112,21 @@ export const catalogRouter = createTRPCRouter({
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
       if (id) {
-        return db.elementType.update({ where: { id }, data: { ...data, basePrice: data.basePrice } });
+        await assertOwnedById(db.elementType, id, catalog.id);
+        return db.elementType.update({ where: { id }, data });
       }
-      return db.elementType.create({ data: { ...data, catalogId: catalog.id, basePrice: data.basePrice } });
+      return db.elementType.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
   // ── ComponentTemplates de un ElementType ────────────────────────────────────
 
   setComponentTemplates: protectedProcedure
     .input(z.object({
-      elementTypeId: z.string().cuid(),
+      elementTypeId: z.string(),
       templates: z.array(z.object({
-        id: z.string().cuid().optional(),
+        id: z.string().optional(),
         componentType: z.nativeEnum(ComponentType),
-        label: z.string().optional(),
+        label: optStr,
         widthFormula: z.string().min(1),
         heightFormula: z.string().min(1),
         depthFormula: z.string().default("D"),
@@ -82,38 +142,38 @@ export const catalogRouter = createTRPCRouter({
       })),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Verificar pertenencia al instalador
-      const et = await db.elementType.findUniqueOrThrow({
-        where: { id: input.elementTypeId },
-        include: { catalog: true },
-      });
-      if (et.catalog.userId !== ctx.session.user.id) throw new Error("Sin acceso.");
+      const catalog = await getOrCreateCatalog(ctx.session.user.id);
+      await assertOwnedById(db.elementType, input.elementTypeId, catalog.id);
 
-      // Reemplazar todos los templates (más simple que upsert individual)
-      await db.componentTemplate.deleteMany({ where: { elementTypeId: input.elementTypeId } });
-      await db.componentTemplate.createMany({
-        data: input.templates.map((t) => ({ ...t, elementTypeId: input.elementTypeId, id: undefined })),
-      });
+      await db.$transaction([
+        db.componentTemplate.deleteMany({ where: { elementTypeId: input.elementTypeId } }),
+        db.componentTemplate.createMany({
+          data: input.templates.map(({ id: _id, ...t }) => ({ ...t, elementTypeId: input.elementTypeId })),
+        }),
+      ]);
     }),
 
   // ── Material ─────────────────────────────────────────────────────────────────
 
   upsertMaterial: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       category: z.nativeEnum(MaterialCategory),
       pricePerM2: z.number().min(0),
       thicknessMM: z.number().int().positive().default(18),
-      textureUrl: z.string().url().optional(),
-      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-      aiDescription: z.string().optional(),
+      textureUrl: optUrl,
+      color: optHexColor,
+      aiDescription: optStr,
       isActive: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
-      if (id) return db.material.update({ where: { id }, data });
+      if (id) {
+        await assertOwnedById(db.material, id, catalog.id);
+        return db.material.update({ where: { id }, data });
+      }
       return db.material.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
@@ -121,20 +181,23 @@ export const catalogRouter = createTRPCRouter({
 
   upsertHardware: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       category: z.nativeEnum(HardwareCategory),
       qualityTier: z.nativeEnum(QualityTier),
-      brand: z.string().optional(),
+      brand: optStr,
       pricePerUnit: z.number().min(0),
       unit: z.string().default("und"),
-      description: z.string().optional(),
-      imageUrl: z.string().url().optional(),
+      description: optStr,
+      imageUrl: optUrl,
     }))
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
-      if (id) return db.hardware.update({ where: { id }, data });
+      if (id) {
+        await assertOwnedById(db.hardware, id, catalog.id);
+        return db.hardware.update({ where: { id }, data });
+      }
       return db.hardware.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
@@ -142,19 +205,22 @@ export const catalogRouter = createTRPCRouter({
 
   upsertSurfaceFinish: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       type: z.nativeEnum(SurfaceFinishType),
       pricePerM2: z.number().min(0),
-      textureUrl: z.string().url().optional(),
-      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-      aiDescription: z.string().optional(),
+      textureUrl: optUrl,
+      color: optHexColor,
+      aiDescription: optStr,
       isActive: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
-      if (id) return db.surfaceFinish.update({ where: { id }, data });
+      if (id) {
+        await assertOwnedById(db.surfaceFinish, id, catalog.id);
+        return db.surfaceFinish.update({ where: { id }, data });
+      }
       return db.surfaceFinish.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
@@ -162,17 +228,20 @@ export const catalogRouter = createTRPCRouter({
 
   upsertEdgeTreatment: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       type: z.nativeEnum(EdgeType),
       pricePerML: z.number().min(0),
-      thicknessMM: z.number().int().positive().optional(),
-      description: z.string().optional(),
+      thicknessMM: z.number().int().positive().nullish().transform((v) => v ?? undefined),
+      description: optStr,
     }))
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
-      if (id) return db.edgeTreatment.update({ where: { id }, data });
+      if (id) {
+        await assertOwnedById(db.edgeTreatment, id, catalog.id);
+        return db.edgeTreatment.update({ where: { id }, data });
+      }
       return db.edgeTreatment.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
@@ -180,17 +249,20 @@ export const catalogRouter = createTRPCRouter({
 
   upsertAssemblySupply: protectedProcedure
     .input(z.object({
-      id: z.string().cuid().optional(),
+      id: z.string().optional(),
       name: z.string().min(1),
       category: z.nativeEnum(SupplyCategory),
       unit: z.string().min(1),
       pricePerUnit: z.number().min(0),
-      autoCalcRule: z.string().optional(),
+      autoCalcRule: optStr,
     }))
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       const { id, ...data } = input;
-      if (id) return db.assemblySupply.update({ where: { id }, data });
+      if (id) {
+        await assertOwnedById(db.assemblySupply, id, catalog.id);
+        return db.assemblySupply.update({ where: { id }, data });
+      }
       return db.assemblySupply.create({ data: { ...data, catalogId: catalog.id } });
     }),
 
@@ -200,7 +272,7 @@ export const catalogRouter = createTRPCRouter({
   bulkUpdatePrices: protectedProcedure
     .input(z.object({
       entity: z.enum(["material", "hardware", "surfaceFinish", "edgeTreatment", "assemblySupply", "finish"]),
-      ids: z.array(z.string().cuid()),
+      ids: z.array(z.string()),
       pctChange: z.number().min(-100).max(500), // ej. 15 = +15%
     }))
     .mutation(async ({ ctx, input }) => {
@@ -218,9 +290,9 @@ export const catalogRouter = createTRPCRouter({
       };
 
       const field = priceField[input.entity]!;
-      const model = (db as Record<string, unknown>)[input.entity] as {
-        findMany: (args: unknown) => Promise<Array<Record<string, unknown>>>;
-        update: (args: unknown) => Promise<unknown>;
+      const model = db[input.entity] as unknown as {
+        findMany: (args: { where: { catalogId: string; id: { in: string[] } } }) => Promise<Array<{ id: string } & Record<string, unknown>>>;
+        update: (args: { where: { id: string }; data: Record<string, number> }) => import("@prisma/client").Prisma.PrismaPromise<unknown>;
       };
 
       const items = await model.findMany({
@@ -230,12 +302,28 @@ export const catalogRouter = createTRPCRouter({
       await db.$transaction(
         items.map((item) =>
           model.update({
-            where: { id: item.id as string },
+            where: { id: item.id },
             data: { [field]: Number(item[field]) * multiplier },
-          })
-        )
+          }),
+        ),
       );
 
       return { updated: items.length };
     }),
+
+  // ── Finish (acabados de obra) ────────────────────────────────────────────────
+
+  upsertFinish: protectedProcedure
+    .input(z.object({
+      id:         z.string().optional(),
+      name:       z.string().min(1),
+      pricePerM2: z.number().min(0),
+      unit:       z.string().default("m²"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const catalog = await getOrCreateCatalog(ctx.session.user.id);
+      const { id, ...data } = input;
+    if (id) return db.finish.update({ where: { id }, data });
+    return db.finish.create({ data: { ...data, catalogId: catalog.id } });
+  }),
 });

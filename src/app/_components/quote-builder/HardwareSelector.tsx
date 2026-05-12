@@ -4,7 +4,7 @@ import { api } from "@/trpc/react";
 import { type RouterOutputs } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
-import type { QualityTier } from "@prisma/client";
+import type { QualityTier,Hardware } from "@prisma/client";
 import { useState } from "react";
 
 type HardwareItem = RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number]["hardwareItems"][number];
@@ -25,20 +25,24 @@ export function HardwareSelector({ quoteItemId, hardwareItems }: {
   const [selectedHardwareId, setSelectedHardwareId] = useState("");
   const [qty, setQty] = useState(1);
 
-  const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, { staleTime: 10 * 60 * 1000,
+  gcTime:    30 * 60 * 1000, });
 
   const upsert = api.quotes.upsertHardwareItem.useMutation({
     onSuccess: () => { setAdding(false); setSelectedHardwareId(""); setQty(1); invalidate(); },
   });
   const remove = api.quotes.removeHardwareItem.useMutation({ onSuccess: invalidate });
 
-  // Agrupar catálogo por categoría
-  const byCategory = (catalog?.hardware ?? []).reduce((acc, h) => {
-    const list = acc[h.category] ?? [];
-    list.push(h);
-    acc[h.category] = list;
-    return acc;
-  }, {} as Record<string, typeof catalog.hardware>);
+ const Chardware: Hardware[] | undefined = catalog?.hardware;
+
+// Agrupar catálogo por categoría
+const byCategory = (Chardware ?? []).reduce((acc, h) => {
+  const list = acc[h.category] ?? [];
+  list.push(h);
+  acc[h.category] = list;
+  return acc;
+}, {} as Record<string, Hardware[]>);
+  // console.log(byCategory,"byCategory",catalog,"catalog")
 
   return (
     <div className="space-y-2">

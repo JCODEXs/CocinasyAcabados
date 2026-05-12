@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Download, Share2, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { serializeDecimals } from "@/server/lib/serialize";
+
 
 // Página de visualización de cotización para clientes
 export default function QuoteViewPage() {

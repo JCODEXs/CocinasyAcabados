@@ -17,8 +17,9 @@ const GROUP_TYPE_LABELS: Record<string, string> = {
   ISLAND: "Isla", PENINSULA: "Península", STANDALONE: "Individual",
 };
 
-export function LayoutCanvas({ project }: { project: Project }) {
-  const { projectId, invalidate } = useQuoteBuilder();
+export function LayoutCanvas() {
+  const { project, projectId, invalidateProject } = useQuoteBuilder();
+  if (!project) return null;
   const [view, setView] = useState<View>("list");
   const [creatingGroup, setCreatingGroup] = useState(false);
 
@@ -27,6 +28,7 @@ export function LayoutCanvas({ project }: { project: Project }) {
   });
 
   const handleCreateGroup = (type: GroupType) => {
+    // console.log(projectId,type,"info deseado")
     setCreatingGroup(true);
     createGroup.mutate({
       projectId,

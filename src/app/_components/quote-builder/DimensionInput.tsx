@@ -1,3 +1,4 @@
+// src/components/quote-builder/DimensionInput.tsx — add debounce
 "use client";
 
 import { useState, useRef } from "react";
@@ -14,16 +15,23 @@ interface Props {
 }
 
 export function DimensionInput({ label, value, unit, disabled, min = 1, max = 999, step = 0.5, onChange }: Props) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing]   = useState(false);
   const [localVal, setLocalVal] = useState(String(value));
-  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep in sync when parent value changes (after server confirmation)
+  if (!editing && String(value) !== localVal) {
+    setLocalVal(String(value));
+  }
 
   const commit = () => {
     const n = parseFloat(localVal);
     if (!isNaN(n) && n >= min && n <= max) {
-      onChange(n);
+      // Debounce: cancel previous pending call
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => onChange(n), 300);
     } else {
-      setLocalVal(String(value)); // revertir si es inválido
+      setLocalVal(String(value));
     }
     setEditing(false);
   };
@@ -32,9 +40,7 @@ export function DimensionInput({ label, value, unit, disabled, min = 1, max = 99
     return (
       <div className="flex flex-col items-center">
         <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          {value}{unit}
-        </span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{value}{unit}</span>
       </div>
     );
   }
@@ -44,7 +50,6 @@ export function DimensionInput({ label, value, unit, disabled, min = 1, max = 99
       <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
       {editing ? (
         <input
-          ref={inputRef}
           type="number"
           value={localVal}
           min={min}
@@ -52,7 +57,10 @@ export function DimensionInput({ label, value, unit, disabled, min = 1, max = 99
           step={step}
           onChange={e => setLocalVal(e.target.value)}
           onBlur={commit}
-          onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
+          onKeyDown={e => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") { setLocalVal(String(value)); setEditing(false); }
+          }}
           autoFocus
           className="w-16 rounded border border-blue-400 bg-white py-0.5 text-center text-xs font-medium focus:outline-none dark:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
         />
