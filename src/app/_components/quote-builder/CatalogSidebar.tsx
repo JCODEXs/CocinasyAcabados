@@ -33,21 +33,28 @@ export function CatalogSidebar() {
   const { catalog, projectId, invalidateProject, selectedGroupId } = useQuoteBuilder();
   const [search, setSearch] = useState("");
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return catalog?.elementTypes;
-    const q = search.toLowerCase();
-    return catalog.elementTypes.filter(e => e.name.toLowerCase().includes(q));
-  }, [search, catalog?.elementTypes]);
+const filtered = useMemo((): ElementType[] => {
+  if (!catalog?.elementTypes) return [];
+  if (!search.trim()) return catalog.elementTypes;
+  
+  const q = search.toLowerCase();
+  return catalog.elementTypes.filter(e => e.name.toLowerCase().includes(q));
+}, [search, catalog?.elementTypes]);
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, ElementType[]>();
-    for (const et of filtered) {
-      const list = map.get(et.category) ?? [];
-      list.push(et);
-      map.set(et.category, list);
+const byCategory = useMemo((): Map<string, ElementType[]> => {
+  const map = new Map<string, ElementType[]>();
+  
+  for (const et of filtered) {
+    const existing = map.get(et.category);
+    if (existing) {
+      existing.push(et);
+    } else {
+      map.set(et.category, [et]);
     }
-    return map;
-  }, [filtered]);
+  }
+  
+  return map;
+}, [filtered]);
 
   return (
     <div className="flex h-full flex-col">
@@ -102,11 +109,11 @@ export function CatalogSidebar() {
           );
         })}
 
-        {filtered.length === 0 && (
+        {filtered?.length === 0 && (
           <p className="py-8 text-center text-sm text-gray-400">Sin resultados</p>
         )}
 
-        {catalog.elementTypes.length === 0 && (
+        {catalog?.elementTypes.length === 0 && (
           <div className="py-8 text-center">
             <p className="text-sm text-gray-400">Catálogo vacío</p>
             <a href="/dashboard/catalog" className="mt-2 block text-xs text-blue-500 hover:underline">

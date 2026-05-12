@@ -18,6 +18,7 @@ type DimensionPatch = Partial<Pick<QuoteItem,
 
 function evalFormula(formula: string, W: number, H: number, D: number): number {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
     const result = Function(
       `"use strict"; const W=${W}, H=${H}, D=${D}; return (${formula})`
     )() as number;

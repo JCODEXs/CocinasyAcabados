@@ -31,17 +31,17 @@ const GROUP_TYPE_BADGE: Record<string, string> = {
 };
 
 export function LayoutGroupPanel({ group }: { group: Group }) {
-  const { invalidate, selectedGroupId, setSelectedGroupId } = useQuoteBuilder();
+  const { invalidateProject, selectedGroupId, setSelectedGroupId } = useQuoteBuilder();
   const [collapsed, setCollapsed] = useState(false);
   const [items, setItems]         = useState(group.items);
 const id = useId()
   const isSelected = selectedGroupId === group.id;
 
-  const reorder    = api.layout.reorderItems.useMutation({ onSuccess: invalidate });
+  const reorder    = api.layout.reorderItems.useMutation({ onSuccess: invalidateProject });
   const deleteGroup= api.layout.deleteGroup.useMutation({
-    onSuccess: () => {
+    onSuccess: async() => {
       if (isSelected) setSelectedGroupId(null);
-      invalidate();
+     await invalidateProject();
     },
   });
 
@@ -60,7 +60,7 @@ const id = useId()
         id: item.id,
         groupOrder: idx,
         connectionToNext: idx < reordered.length - 1
-          ? (item.connectionToNext as string)
+          ? (item.connectionToNext)
           : "END",
       })),
     });

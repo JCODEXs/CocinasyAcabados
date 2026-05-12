@@ -22,8 +22,8 @@ const COP = (n: number) =>
 
 export function SummaryPanel() {
   const { project, catalog, invalidateProject } = useQuoteBuilder();
-  if (!project || !catalog) return null;
   const [tab, setTab] = useState<"items" | "finishes" | "export">("items");
+  if (!project || !catalog) return null;
 
   const updateStatus = api.quotes.updateProjectStatus.useMutation({ onSuccess: invalidateProject });
 
@@ -302,12 +302,12 @@ function SubRow({ label, value }: { label: string; value: number }) {
 // ─── Tab: acabados de obra ────────────────────────────────────────────────────
 
 function FinishesTab({ project, catalog }: { project: Project; catalog: Catalog }) {
-  const { invalidate } = useQuoteBuilder();
+  const { invalidateProject } = useQuoteBuilder();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ finishId: "", areaM2: "" });
 
   const upsert = api.quotes.upsertProjectFinish.useMutation({
-    onSuccess: () => { setAdding(false); setForm({ finishId: "", areaM2: "" }); invalidate(); },
+    onSuccess: async() => { setAdding(false); setForm({ finishId: "", areaM2: "" }); await invalidateProject(); },
   });
 
   const handleAdd = () => {
@@ -323,7 +323,7 @@ function FinishesTab({ project, catalog }: { project: Project; catalog: Catalog 
       )}
 
       {project.projectFinishes.map(pf => (
-        <FinishRow key={pf.id} pf={pf} projectId={project.id} onSaved={invalidate} />
+        <FinishRow key={pf.id} pf={pf} projectId={project.id} onSaved={invalidateProject} />
       ))}
 
       {adding ? (
@@ -574,7 +574,7 @@ function ExportCard({ title, description, status, onAction, actionLabel, resultL
 
 // ─── Utilidades compartidas ───────────────────────────────────────────────────
 
-function TotalRow({ label, value, muted, large }: {
+function TotalRow({ label, value, large }: {
   label: string; value: number; muted?: boolean; large?: boolean;
 }) {
   return (

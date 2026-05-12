@@ -78,7 +78,7 @@ async function assertProjectOwner(projectId: string, userId: string) {
     where:  { id: projectId },
     select: { userId: true },
   });
-  if (!project || project.userId !== userId) {
+  if (project?.userId !== userId) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acceso denegado." });
   }
 }
@@ -447,7 +447,7 @@ export const quotesRouter = createTRPCRouter({
           quoteItem: { select: { projectId: true, project: { select: { userId: true } } } },
         },
       });
-      if (!hw || hw.quoteItem.project.userId !== ctx.session.user.id) {
+      if (hw?.quoteItem.project.userId !== ctx.session.user.id) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 

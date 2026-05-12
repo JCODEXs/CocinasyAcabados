@@ -136,7 +136,7 @@ function StatusBadge({ status }: { status: string }) {
     APPROVED: "Aprobado", IN_PROGRESS: "En proceso", COMPLETED: "Completado",
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? styles["DRAFT"]}`}>
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? styles.DRAFT}`}>
       {labels[status] ?? status}
     </span>
   );
