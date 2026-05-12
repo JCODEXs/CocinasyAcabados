@@ -21,7 +21,7 @@ interface CreateClientModalProps {
   onClose: () => void;
 }
 
-export function CreateClientModal({ isOpen, onClose }: CreateClientModalProps) {
+export default function CreateClientModal({ isOpen, onClose }: CreateClientModalProps) {
   const utils = api.useUtils();
   const [formData, setFormData] = useState({
     name: "",
