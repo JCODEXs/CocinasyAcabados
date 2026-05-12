@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Plus } from "lucide-react";
-import { CreateClientModal } from "./create/page";
+import { CreateClientModal } from "../../../_components/create/CreateClientModal";
 
 export default function ClientsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
