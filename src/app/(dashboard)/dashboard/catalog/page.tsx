@@ -1,12 +1,118 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
+import type { ElementCategory, MaterialCategory, HardwareCategory, QualityTier, SurfaceFinishType, EdgeType, SupplyCategory, ComponentType } from "@prisma/client";
 
+
+
+// interface Material {
+//   id: string;
+//   name: string;
+//   category: string;
+//   pricePerM2: number;
+//   thicknessMM: number;
+//   color: string;
+//   aiDescription: string;
+// }
+
+// interface Hardware {
+//   id: string;
+//   name: string;
+//   category: string;
+//   qualityTier: string;
+//   brand: string;
+//   pricePerUnit: number;
+//   unit: string;
+//   description: string;
+// }
+
+// interface Finish {
+//   id: string;
+//   name: string;
+//   pricePerM2: number;
+//   unit: string;
+// }
+
+// interface EdgeTreatment {
+//   id: string;
+//   name: string;
+//   type: string;
+//   pricePerML: number;
+// }
+
+// interface AssemblySupply {
+//   id: string;
+//   name: string;
+//   category: string;
+//   unit: string;
+//   pricePerUnit: number;
+//   autoCalcRule: string;
+// }
+const COMPONENT_TYPES = [
+  "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
+  "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
+] as const; // ✅ Usar 'as const' para inferir el tipo literal
+
+// type ComponentTypeValue = typeof COMPONENT_TYPES[number]; // ✅ Tipo inferido automáticamente
+// export type SurfaceFinishTypeValue = 
+//   | "LACADO" | "CHAPA_MADERA" | "MELAMINA" 
+//   | "VINILO_ADHESIVO" | "PINTURA" | "BARNIZ" | "SIN_ACABADO";
+
+interface ComponentTemplate {
+  id?: string;
+  componentType:ComponentType ;
+  label?: string;
+  widthFormula: string;
+  heightFormula: string;
+  depthFormula: string;
+  thicknessMM: number;
+  quantity: number;
+  sortOrder: number;
+  topEdge: boolean;
+  bottomEdge: boolean;
+  leftEdge: boolean;
+  rightEdge: boolean;
+  defaultMaterialCategory?: MaterialCategory;
+  defaultSurfaceFinishType?: SurfaceFinishType;
+}
+interface ElementType {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  basePrice: number;
+  threeJsModel: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  defaultDepth: number;
+  allowCustomWidth: boolean;
+  allowCustomHeight: boolean;
+  allowCustomDepth: boolean;
+  componentTemplates?: ComponentTemplate[];
+}
+interface ElementTypeForm {
+  id?: string;
+  name: string;
+  category: string;
+  unit: string;
+  basePrice: number;
+  threeJsModel: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  defaultDepth: number;
+  allowCustomWidth: boolean;
+  allowCustomHeight: boolean;
+  allowCustomDepth: boolean;
+}
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "@/trpc/react";
 import { PlusIcon, PencilIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
-import { serializeDecimals } from "@/server/lib/serialize";
+import { getComponentTypeModule } from "next/dist/server/lib/app-dir-module";
+// import { serializeDecimals } from "@/server/lib/serialize";
 
 // ─── Tipos de display ─────────────────────────────────────────────────────────
 
@@ -104,138 +210,7 @@ export default function CatalogPage() {
   );
 }
 
-// ─── Tab: Tipos de elemento ───────────────────────────────────────────────────
-
-// function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }) {
-//   const [showForm, setShowForm] = useState(false);
-//   const [editing, setEditing]   = useState<any>(null);
-//   const upsert = api.catalog.upsertElementType.useMutation({
-//     onSuccess: () => { setShowForm(false); setEditing(null); onSaved(); },
-//   });
-
-//   const empty = {
-//     name: "", category: "MUEBLE_BAJO", unit: "POR_ML",
-//     basePrice: 0, threeJsModel: "LowerCabinet",
-//     defaultWidth: 60, defaultHeight: 72, defaultDepth: 60,
-//     allowCustomWidth: true, allowCustomHeight: false, allowCustomDepth: false,
-//   };
-//   const [form, setForm] = useState(empty);
-
-//   const openNew  = () => { setForm(empty); setEditing(null); setShowForm(true); };
-//   const openEdit = (et: any) => {
-//     setForm({ ...et, basePrice: Number(et.basePrice) });
-//     setEditing(et);
-//     setShowForm(true);
-//   };
-
-//   const THREE_JS_MODELS = [
-//     "LowerCabinet", "UpperCabinet", "UpperCabinetGlass",
-//     "Island", "Appliance", "WallPanel", "CountertopSection",
-//   ];
-
-//   return (
-//     <div className="space-y-4">
-//       <div className="flex items-center justify-between">
-//         <p className="text-sm text-gray-500">{catalog?.elementTypes?.length ?? 0} tipos configurados</p>
-//         <button onClick={openNew} className="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900">
-//           <PlusIcon className="h-4 w-4" /> Nuevo tipo
-//         </button>
-//       </div>
-
-//       {showForm && (
-//         <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-//           <h3 className="mb-4 text-sm font-medium text-gray-900 dark:text-gray-100">
-//             {editing ? "Editar tipo" : "Nuevo tipo de elemento"}
-//           </h3>
-//           <div className="grid grid-cols-2 gap-4">
-//             <Field label="Nombre">
-//               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-//                 placeholder="Ej: Mueble bajo estándar"
-//                 className="input" />
-//             </Field>
-//             <Field label="Categoría">
-//               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="input">
-//                 {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-//               </select>
-//             </Field>
-//             <Field label="Unidad de precio">
-//               <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className="input">
-//                 {Object.entries(UNIT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-//               </select>
-//             </Field>
-//             <Field label="Precio base (COP)">
-//               <input type="number" value={form.basePrice} onChange={e => setForm(f => ({ ...f, basePrice: +e.target.value }))} className="input" />
-//             </Field>
-//             <Field label="Modelo 3D">
-//               <select value={form.threeJsModel} onChange={e => setForm(f => ({ ...f, threeJsModel: e.target.value }))} className="input">
-//                 {THREE_JS_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
-//               </select>
-//             </Field>
-//             <Field label="Alto por defecto (cm)">
-//               <input type="number" value={form.defaultHeight ?? ""} onChange={e => setForm(f => ({ ...f, defaultHeight: +e.target.value }))} className="input" />
-//             </Field>
-//             <Field label="Ancho por defecto (cm)">
-//               <input type="number" value={form.defaultWidth ?? ""} onChange={e => setForm(f => ({ ...f, defaultWidth: +e.target.value }))} className="input" />
-//             </Field>
-//             <Field label="Fondo por defecto (cm)">
-//               <input type="number" value={form.defaultDepth ?? ""} onChange={e => setForm(f => ({ ...f, defaultDepth: +e.target.value }))} className="input" />
-//             </Field>
-//           </div>
-//           <div className="mt-4 flex gap-3">
-//             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-//               <input type="checkbox" checked={form.allowCustomWidth}
-//                 onChange={e => setForm(f => ({ ...f, allowCustomWidth: e.target.checked }))} />
-//               Ancho variable
-//             </label>
-//             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-//               <input type="checkbox" checked={form.allowCustomHeight}
-//                 onChange={e => setForm(f => ({ ...f, allowCustomHeight: e.target.checked }))} />
-//               Alto variable
-//             </label>
-//             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-//               <input type="checkbox" checked={form.allowCustomDepth}
-//                 onChange={e => setForm(f => ({ ...f, allowCustomDepth: e.target.checked }))} />
-//               Fondo variable
-//             </label>
-//           </div>
-//           <div className="mt-5 flex gap-2">
-//             <button onClick={() => { setShowForm(false); setEditing(null); }}
-//               className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700">
-//               Cancelar
-//             </button>
-//             <button
-//               disabled={upsert.isPending || !form.name}
-//               onClick={() => upsert.mutate({ ...form, id: editing?.id, basePrice: form.basePrice })}
-//               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
-//               {upsert.isPending ? "Guardando..." : "Guardar"}
-//             </button>
-//           </div>
-//         </div>
-//       )}
-
-//       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
-//         {catalog?.elementTypes?.length === 0 && (
-//           <p className="py-12 text-center text-sm text-gray-400">Sin tipos de elemento. Crea el primero o usa el seed.</p>
-//         )}
-//         {catalog?.elementTypes?.map((et: any) => (
-//           <div key={et.id} className="flex items-center justify-between border-b border-gray-100 px-5 py-3 last:border-0 dark:border-gray-800">
-//             <div>
-//               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{et.name}</p>
-//               <p className="text-xs text-gray-400">
-//                 {CATEGORY_LABELS[et.category]} · {COP(Number(et.basePrice))} {UNIT_LABELS[et.unit]} · {et.threeJsModel}
-//               </p>
-//             </div>
-//             <div className="flex gap-2">
-//               <button onClick={() => openEdit(et)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800">
-//                 <PencilIcon className="h-4 w-4" />
-//               </button>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
+ 
 // ─── Tab: Tipos de elemento ───────────────────────────────────────────────────
 
 function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }) {
@@ -253,7 +228,7 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
     defaultWidth: 60, defaultHeight: 72, defaultDepth: 60,
     allowCustomWidth: true, allowCustomHeight: false, allowCustomDepth: false,
   };
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState<ElementTypeForm>(empty);
 
   const openNew  = () => { setForm(empty); setEditing(null); setShowForm(true); };
   const openEdit = (et: any) => {
@@ -261,7 +236,13 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
     setEditing(et);
     setShowForm(true);
   };
+const CHECKBOX_FIELDS = [
+  { key: "allowCustomWidth", label: "Ancho variable" },
+  { key: "allowCustomHeight", label: "Alto variable" },
+  { key: "allowCustomDepth", label: "Fondo variable" },
+] as const; // TypeScript infers literal types
 
+type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
   const THREE_JS_MODELS = [
     "LowerCabinet", "UpperCabinet", "UpperCabinetGlass",
     "Island", "Appliance", "WallPanel", "CountertopSection",
@@ -319,20 +300,18 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
                 onChange={e => setForm(f => ({ ...f, defaultDepth: +e.target.value }))} className="input" />
             </Field>
           </div>
-          <div className="mt-4 flex gap-4">
-            {[
-              ["allowCustomWidth", "Ancho variable"],
-              ["allowCustomHeight", "Alto variable"],
-              ["allowCustomDepth", "Fondo variable"],
-            ].map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <input type="checkbox"
-                  checked={(form as any)[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))} />
-                {label}
-              </label>
-            ))}
-          </div>
+         <div className="mt-4 flex gap-4">
+  {CHECKBOX_FIELDS.map(({ key, label }) => (
+    <label key={key} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <input
+        type="checkbox"
+        checked={form[key]} // ✅ TypeScript knows key is a valid key
+        onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
+      />
+      {label}
+    </label>
+  ))}
+</div>
           <div className="mt-5 flex gap-2">
             <button onClick={() => { setShowForm(false); setEditing(null); }}
               className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700">
@@ -340,8 +319,11 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
             </button>
             <button
               disabled={upsert.isPending || !form.name}
-              onClick={() => upsert.mutate({ ...form, id: editing?.id, basePrice: form.basePrice })}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
+             onClick={() => upsert.mutate({ ...form, 
+  id: editing?.id, 
+  basePrice: form.basePrice 
+} as Parameters<typeof upsert.mutate>[0])}
+  className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
               {upsert.isPending ? "Guardando..." : "Guardar"}
             </button>
           </div>
@@ -401,10 +383,10 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
 }
 // ─── Editor de paneles (ComponentTemplates) ───────────────────────────────────
 
-const COMPONENT_TYPES = [
-  "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
-  "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
-] as const;
+// const COMPONENT_TYPES = [
+//   "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
+//   "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
+// ] as const;
 
 const COMPONENT_TYPE_LABELS: Record<string, string> = {
   LATERAL: "Lateral", FONDO: "Fondo", TECHO: "Techo", PISO: "Piso",
@@ -424,25 +406,9 @@ const SURFACE_FINISH_TYPES: Record<string, string> = {
   VINILO_ADHESIVO: "Vinilo", PINTURA: "Pintura", BARNIZ: "Barniz", SIN_ACABADO: "Sin acabado",
 };
 
-type TemplateRow = {
-  id?: string;
-  componentType: string;
-  label: string;
-  widthFormula: string;
-  heightFormula: string;
-  depthFormula: string;
-  thicknessMM: number;
-  quantity: number;
-  sortOrder: number;
-  topEdge: boolean;
-  bottomEdge: boolean;
-  leftEdge: boolean;
-  rightEdge: boolean;
-  defaultMaterialCategory: string;
-  defaultSurfaceFinishType: string;
-};
 
-const emptyTemplate = (): TemplateRow => ({
+
+const emptyTemplate = (): ComponentTemplate => ({
   componentType: "LATERAL",
   label: "",
   widthFormula: "D",
@@ -455,8 +421,8 @@ const emptyTemplate = (): TemplateRow => ({
   bottomEdge: false,
   leftEdge: false,
   rightEdge: false,
-  defaultMaterialCategory: "",
-  defaultSurfaceFinishType: "",
+  defaultMaterialCategory: "MADERA_NATURAL",
+  defaultSurfaceFinishType: "SIN_ACABADO",
 });
 
 function ComponentTemplatesEditor({
@@ -468,27 +434,27 @@ function ComponentTemplatesEditor({
   templates: any[];
   onSaved: () => void;
 }) {
-  const [rows, setRows] = useState<TemplateRow[]>(() =>
-    templates.length > 0
-      ? templates.map((t: any) => ({
-          id: t.id,
-          componentType: t.componentType,
-          label: t.label ?? "",
-          widthFormula: t.widthFormula,
-          heightFormula: t.heightFormula,
-          depthFormula: t.depthFormula ?? "D",
-          thicknessMM: t.thicknessMM,
-          quantity: t.quantity,
-          sortOrder: t.sortOrder,
-          topEdge: t.topEdge,
-          bottomEdge: t.bottomEdge,
-          leftEdge: t.leftEdge,
-          rightEdge: t.rightEdge,
-          defaultMaterialCategory: t.defaultMaterialCategory ?? "",
-          defaultSurfaceFinishType: t.defaultSurfaceFinishType ?? "",
-        }))
-      : []
-  );
+const [rows, setRows] = useState<ComponentTemplate[]>(() => 
+  templates.length > 0 
+    ? templates.map((t: any) => ({
+        id: t.id,
+        componentType: t.componentType as ComponentType, // ✅ Type assertion
+        label: t.label ?? "",
+        widthFormula: t.widthFormula,
+        heightFormula: t.heightFormula,
+        depthFormula: t.depthFormula ?? "D",
+        thicknessMM: t.thicknessMM,
+        quantity: t.quantity,
+        sortOrder: t.sortOrder,
+        topEdge: t.topEdge,
+        bottomEdge: t.bottomEdge,
+        leftEdge: t.leftEdge,
+        rightEdge: t.rightEdge,
+        defaultMaterialCategory: t.defaultMaterialCategory as MaterialCategory ?? "MADERA_NATURAL",
+        defaultSurfaceFinishType: t.defaultSurfaceFinishType as SurfaceFinishType ?? "SIN_ACABADO",
+      }))
+    : []
+);
 
   const [dirty, setDirty] = useState(false);
 
@@ -496,7 +462,7 @@ function ComponentTemplatesEditor({
     onSuccess: () => { setDirty(false); onSaved(); },
   });
 
-  const updateRow = (idx: number, patch: Partial<TemplateRow>) => {
+  const updateRow = (idx: number, patch: Partial<ComponentTemplate>) => {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
     setDirty(true);
   };
@@ -520,17 +486,18 @@ function ComponentTemplatesEditor({
     setDirty(true);
   };
 
-  const handleSave = () => {
-    save.mutate({
-      elementTypeId,
-      templates: rows.map((r, i) => ({
-        ...r,
-        sortOrder: i,
-        defaultMaterialCategory: r.defaultMaterialCategory || undefined,
-        defaultSurfaceFinishType: r.defaultSurfaceFinishType || undefined,
-      })),
-    });
-  };
+ const handleSave = () => {
+  save.mutate({
+    elementTypeId,
+    templates: rows.map((r, i): ComponentTemplate => ({
+      ...r,
+      sortOrder: i,
+      // Usar ! para asegurar que no es null/undefined, o mantener undefined
+      defaultMaterialCategory: r.defaultMaterialCategory??undefined,
+      defaultSurfaceFinishType: r.defaultSurfaceFinishType ??undefined,
+    })),
+  });
+};
 
   return (
     <div>
@@ -605,7 +572,7 @@ function ComponentTemplatesEditor({
                   <td className="px-2 py-1.5">
                     <select
                       value={row.componentType}
-                      onChange={e => updateRow(idx, { componentType: e.target.value })}
+                      onChange={e => updateRow(idx, { componentType: e.target.value as ComponentType })}
                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                     >
                       {COMPONENT_TYPES.map(t => (
@@ -686,7 +653,7 @@ function ComponentTemplatesEditor({
                   <td className="px-2 py-1.5">
                     <select
                       value={row.defaultMaterialCategory}
-                      onChange={e => updateRow(idx, { defaultMaterialCategory: e.target.value })}
+                      onChange={e => updateRow(idx, { defaultMaterialCategory: e.target.value as MaterialCategory })}
                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                     >
                       <option value="">— Cualquiera —</option>
@@ -700,7 +667,7 @@ function ComponentTemplatesEditor({
                   <td className="px-2 py-1.5">
                     <select
                       value={row.defaultSurfaceFinishType}
-                      onChange={e => updateRow(idx, { defaultSurfaceFinishType: e.target.value })}
+                      onChange={e => updateRow(idx, { defaultSurfaceFinishType: e.target.value as SurfaceFinishType})}
                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                     >
                       <option value="">— Ninguno —</option>
@@ -749,13 +716,14 @@ function ComponentTemplatesEditor({
 
 // ─── Preview de fórmulas ──────────────────────────────────────────────────────
 
-function FormulaPreview({ rows }: { rows: TemplateRow[] }) {
+function FormulaPreview({ rows }: { rows: ComponentTemplate[] }) {
   const [W, setW] = useState(60);
   const [H, setH] = useState(72);
   const [D, setD] = useState(60);
 
   const evalF = (formula: string): string => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const result = Function(`"use strict"; const W=${W}, H=${H}, D=${D}; return (${formula})`)() as number;
       return result.toFixed(1);
     } catch {
@@ -811,7 +779,15 @@ function FormulaPreview({ rows }: { rows: TemplateRow[] }) {
 
 // ─── Tab: Materiales ──────────────────────────────────────────────────────────
 
-function MaterialsTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }) {
+interface MaterialForm {
+  name: string;
+  category: string;
+  pricePerM2: number;
+  thicknessMM: number;
+  color: string;
+  aiDescription: string;
+}
+function MaterialsTab({ catalog, onSaved }: { catalog:any, onSaved: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<any>(null);
   const upsert = api.catalog.upsertMaterial.useMutation({
@@ -826,7 +802,7 @@ function MaterialsTab({ catalog, onSaved }: { catalog: any; onSaved: () => void 
   };
 
   const empty = { name: "", category: "MDF_LACADO", pricePerM2: 0, thicknessMM: 18, color: "#d8d0c4", aiDescription: "" };
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState<MaterialForm>(empty);
 
   const openNew  = () => { setForm(empty); setEditing(null); setShowForm(true); };
   const openEdit = (m: any) => { setForm({ ...m, pricePerM2: Number(m.pricePerM2) }); setEditing(m); setShowForm(true); };
@@ -879,7 +855,7 @@ function MaterialsTab({ catalog, onSaved }: { catalog: any; onSaved: () => void 
             </button>
             <button
               disabled={upsert.isPending || !form.name}
-              onClick={() => upsert.mutate({ ...form, id: editing?.id })}
+              onClick={() => upsert.mutate({ ...form, id: editing?.id } as any)}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
               {upsert.isPending ? "Guardando..." : "Guardar"}
             </button>
@@ -974,7 +950,7 @@ function HardwareTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }
               className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700">Cancelar</button>
             <button
               disabled={upsert.isPending || !form.name}
-              onClick={() => upsert.mutate({ ...form, id: editing?.id })}
+             onClick={() => upsert.mutate({ ...form, id: editing?.id } as any)}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
               {upsert.isPending ? "Guardando..." : "Guardar"}
             </button>
@@ -1119,7 +1095,7 @@ function EdgesTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }) {
               className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700">Cancelar</button>
             <button
               disabled={upsert.isPending || !form.name}
-              onClick={() => upsert.mutate({ ...form, id: editing?.id })}
+             onClick={() => upsert.mutate({ ...form, id: editing?.id } as any)}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
               {upsert.isPending ? "Guardando..." : "Guardar"}
             </button>
@@ -1201,7 +1177,7 @@ function SuppliesTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }
               className="rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700">Cancelar</button>
             <button
               disabled={upsert.isPending || !form.name}
-              onClick={() => upsert.mutate({ ...form, id: editing?.id })}
+             onClick={() => upsert.mutate({ ...form, id: editing?.id } as any)}
               className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900">
               {upsert.isPending ? "Guardando..." : "Guardar"}
             </button>
