@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { type RouterOutputs } from "~/trpc/react";
+import { type RouterOutputs } from "@/trpc/react";
 import { KitchenScene }        from "./KitchenScene";
 import { SimpleOrbitControls } from "./controls/OrbitControls";
 import { useQuoteBuilder }     from "../quote-builder/context";
@@ -68,10 +71,13 @@ export function KitchenViewer({ project, className = "" }: Props) {
       rafRef.current = requestAnimationFrame(loop);
       t += 0.015;
       // Leve animación ambiental de luz (strip under-cabinet)
-      const light = scene.scene.children.find(
-        c => c instanceof THREE.PointLight
-      ) as THREE.PointLight | undefined;
-      if (light) light.intensity = 0.45 + Math.sin(t) * 0.07;
+   const light = scene.scene.children.find(
+  (c): c is THREE.PointLight => c instanceof THREE.PointLight
+);
+
+if (light) {
+  light.intensity = 0.45 + Math.sin(t) * 0.07;
+}
       scene.render();
     };
     loop();
