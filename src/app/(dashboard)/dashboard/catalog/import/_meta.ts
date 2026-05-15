@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-base-to-string */
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
 // src/app/(dashboard)/dashboard/catalog/import/_meta.ts
 //
 // Etiquetas y formateadores para los items del catálogo global.

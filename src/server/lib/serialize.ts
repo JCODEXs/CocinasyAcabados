@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/server/lib/serialize.ts
-import { Prisma } from "@prisma/client";
 
 // Convierte recursivamente Prisma.Decimal a number y devuelve objetos planos
 // seguros para SuperJSON. No usar for..in (copia props heredadas como
@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 // src/server/lib/serialize.ts
 export function serializeDecimals(obj: unknown): any {
   if (obj === null || obj === undefined) return obj;
-  if (typeof obj === "object" && "toNumber" in (obj as object)) {
+  if (typeof obj === "object" && "toNumber" in (obj)) {
     return (obj as { toNumber: () => number }).toNumber();
   }
   if (Array.isArray(obj)) return obj.map(serializeDecimals);

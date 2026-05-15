@@ -9,6 +9,8 @@ export function Navbar() {
   const pathname = usePathname()
 
   if (pathname?.includes("/auth/")) return null
+  if (pathname?.includes("/signin")) return null
+  if (pathname?.includes("/error")) return null
 
   const isHome = pathname === "/"
   const isProjects = pathname?.includes("/projects")
