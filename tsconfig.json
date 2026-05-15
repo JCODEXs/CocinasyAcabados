@@ -40,6 +40,6 @@
     "**/*.cjs",
     "**/*.js",
     ".next/types/**/*.ts"
-, "../Appliance.ts"  ],
+, "src/app/_components/kitchen-viewer/objects/Appliance.ts"  ],
   "exclude": ["node_modules", "generated"]
 }

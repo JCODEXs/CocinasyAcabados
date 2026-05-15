@@ -179,9 +179,15 @@ export abstract class KitchenObject extends THREE.Group {
     ud.groupId       = params.groupId;
     ud.label         = params.label ?? "Elemento";
 
-    this.build();
-    if (params.materialConfig) this.applyMaterialConfig(params.materialConfig);
+   
   }
+  protected initialize() {
+  this.build();
+
+  if (this.params.materialConfig) {
+    this.applyMaterialConfig(this.params.materialConfig);
+  }
+}
 
   // ─── API pública ─────────────────────────────────────────────────────────
 
