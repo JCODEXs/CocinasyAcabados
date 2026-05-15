@@ -1,183 +1,302 @@
-import { db } from "@/server/db";
-import { type ComponentType, type MaterialCategory, type SurfaceFinishType } from "@prisma/client";
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { db }      from "@/server/db";
 import { Decimal } from "@prisma/client/runtime/library";
 import { pricingService } from "./pricing.service";
+import { createId } from "@paralleldrive/cuid2"; // pnpm add @paralleldrive/cuid2
 
-// ─── Evaluador de fórmulas dimensionales ─────────────────────────────────────
-// Soporta: "W", "H", "D", "W - 3.6", "H / 2", "18" (fijo mm→cm automático)
+// ─── Enums inline — nunca importar de @prisma/client en servicios del servidor
+// (evita el problema de output path del generador)
 
-function evalFormula(formula: string, W: number, H: number, D: number): number {
-  const clean = formula.trim().replace(/\bW\b/g, String(W)).replace(/\bH\b/g, String(H)).replace(/\bD\b/g, String(D));
+type ComponentType    = "LATERAL" | "FONDO" | "TECHO" | "PISO" | "ENTREPAÑO" |
+                        "PUERTA"  | "FRENTE_CAJON" | "CAJA_CAJON" | "MESON"  |
+                        "ZOCALO"  | "DIVISION" | "RIEL";
+
+type MaterialCategory = "MADERA_NATURAL" | "MDF_LACADO" | "MELAMINA" | "GRANITO" |
+                        "MARMOL" | "CUARZO" | "CERAMICA" | "PANEL_YESO" |
+                        "SUPERBOARD" | "OTRO";
+
+type SurfaceFinishType = "LACADO" | "CHAPA_MADERA" | "MELAMINA" | "VINILO_ADHESIVO" |
+                         "PINTURA" | "BARNIZ" | "SIN_ACABADO";
+
+type EdgeSide = "TOP" | "BOTTOM" | "LEFT" | "RIGHT";
+
+// ─── Tipos internos ───────────────────────────────────────────────────────────
+
+interface ComponentRow {
+  id:              string;
+  quoteItemId:     string;
+  componentType:   ComponentType;
+  label:           string | null;
+  widthCm:         number;
+  heightCm:        number;
+  thicknessMM:     number;
+  quantity:        number;
+  materialId:      string | null;
+  surfaceFinishId: string | null;
+  boardAreaM2:     number;
+  finishAreaM2:    number;
+  unitPrice:       Decimal;
+  totalPrice:      Decimal;
+}
+
+interface EdgeRow {
+  id:              string;
+  componentId:     string;
+  edgeTreatmentId: string;
+  edgeSide:        EdgeSide;
+  lengthML:        number;
+  unitPrice:       Decimal;
+  totalPrice:      Decimal;
+}
+
+interface SupplyRow {
+  quoteItemId:     string;
+  assemblySupplyId: string;
+  quantity:        number;
+  unitPrice:       Decimal;
+  totalPrice:      Decimal;
+  notes:           null;
+}
+
+// ─── Evaluador de fórmulas ────────────────────────────────────────────────────
+// Soporta: "W", "H", "D" y expresiones como "W - 3.6", "H / 2", "W * 0.5"
+// Nunca ejecuta código arbitrario — solo reemplaza variables conocidas
+
+function evalFormula(
+  formula: string,
+  W: number,
+  H: number,
+  D: number,
+): number {
+  // Reemplazar variables — \b asegura que no toca "WIDTH", "DEPTH", etc.
+  const expr = formula
+    .trim()
+    .replace(/\bW\b/g, String(W))
+    .replace(/\bH\b/g, String(H))
+    .replace(/\bD\b/g, String(D));
+
+  // Validar que solo contenga caracteres seguros antes de evaluar
+  if (!/^[\d\s+\-*/().]+$/.test(expr)) {
+    throw new Error(`Fórmula contiene caracteres no permitidos: "${formula}"`);
+  }
+
   try {
-    // eval acotado: solo operaciones aritméticas básicas
-    const result = Function(`"use strict"; return (${clean})`)() as number;
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call
+    const result = (Function(`"use strict"; return (${expr})`) as () => unknown)();
+    if (typeof result !== "number" || !isFinite(result)) {
+      throw new Error(`Resultado no numérico: "${formula}" → ${String(result)}`);
+    }
     return Math.max(0, result);
-  } catch {
-    throw new Error(`Fórmula inválida: "${formula}"`);
+  } catch (err) {
+    throw new Error(`Fórmula inválida: "${formula}" — ${String(err)}`);
   }
 }
 
-// ─── Reglas de cálculo de insumos ────────────────────────────────────────────
+// ─── Cálculo de cantidad de insumos ──────────────────────────────────────────
 
-function calcSupplyQty(rule: string, panelCount: number, totalAreaM2: number): number {
+function calcSupplyQty(
+  rule:        string,
+  panelCount:  number,
+  totalAreaM2: number,
+): number {
   if (rule.endsWith("_PER_PANEL")) {
     const n = parseFloat(rule.replace("_PER_PANEL", ""));
-    return Math.ceil(n * panelCount);
+    return isNaN(n) ? 1 : Math.ceil(n * panelCount);
   }
   if (rule.endsWith("L_PER_M2") || rule.endsWith("KG_PER_M2")) {
     const n = parseFloat(rule);
-    return Math.ceil(n * totalAreaM2 * 10) / 10;
+    return isNaN(n) ? 1 : Math.round(n * totalAreaM2 * 10) / 10;
   }
   return 1;
 }
 
-// ─── Función principal: instanciar BOM completo para un QuoteItem ─────────────
+// ─── Función principal ────────────────────────────────────────────────────────
 
 export async function instantiateBOM(quoteItemId: string): Promise<void> {
+
+  // ── 1. Leer datos necesarios en paralelo ─────────────────────────────────
+
   const item = await db.quoteItem.findUniqueOrThrow({
     where: { id: quoteItemId },
     include: {
-      elementType: { include: { componentTemplates: { orderBy: { sortOrder: "asc" } } } },
-      project: { include: { user: { include: { catalog: true } } } },
+      elementType: {
+        include: {
+          componentTemplates: { orderBy: { sortOrder: "asc" } },
+        },
+      },
+      project: {
+        include: {
+          user: {
+            include: { catalog: true },
+          },
+        },
+      },
     },
   });
 
-  const { width: W, height: H, depth: D } = item;
   const catalogId = item.project.user.catalog?.id;
-  if (!catalogId) throw new Error("El instalador no tiene catálogo configurado.");
-
-  const [defaultMaterials, defaultFinishes, defaultEdge, supplies] = await Promise.all([
-    db.material.findMany({ where: { catalogId, isActive: true } }),
-    db.surfaceFinish.findMany({ where: { catalogId, isActive: true } }),
-    db.edgeTreatment.findFirst({ where: { catalogId }, orderBy: { pricePerML: "asc" } }),
-    db.assemblySupply.findMany({ where: { catalogId, autoCalcRule: { not: null } } }),
-  ]);
-
-  function pickDefault<T extends { category: string }>(list: T[], category: string | null | undefined): T | undefined {
-    if (!category) return list[0];
-    return list.find((x) => x.category === category) ?? list[0];
+  if (!catalogId) {
+    throw new Error(
+      `El instalador (userId: ${item.project.userId}) no tiene catálogo configurado.`
+    );
   }
 
-  // Limpiar en una transacción
-  await db.$transaction([
-    db.componentEdge.deleteMany({ where: { component: { quoteItemId } } }),
-    db.quoteItemComponent.deleteMany({ where: { quoteItemId } }),
-    db.hardwareItem.deleteMany({ where: { quoteItemId } }),
-    db.quoteItemSupply.deleteMany({ where: { quoteItemId } }),
-  ]);
-
+  const { width: W, height: H, depth: D } = item;
   const templates = item.elementType.componentTemplates;
+
+  // Fetch paralelo de recursos del catálogo
+  const [defaultMaterials, defaultFinishes, defaultEdge, autoSupplies] =
+    await Promise.all([
+      db.material.findMany({
+        where: { catalogId, isActive: true },
+        select: { id: true, category: true, pricePerM2: true },
+      }),
+      db.surfaceFinish.findMany({
+        where: { catalogId, isActive: true },
+        select: { id: true, type: true, pricePerM2: true },
+      }),
+      db.edgeTreatment.findFirst({
+        where:   { catalogId },
+        orderBy: { pricePerML: "asc" },
+        select:  { id: true, pricePerML: true },
+      }),
+      db.assemblySupply.findMany({
+        where:  { catalogId, autoCalcRule: { not: null } },
+        select: { id: true, pricePerUnit: true, autoCalcRule: true },
+      }),
+    ]);
+
+  // Helper: encontrar material/acabado por categoría
+  function pickMaterial(category: string | null | undefined) {
+    if (!category) return defaultMaterials[0] ?? null;
+    return (
+      defaultMaterials.find(m => m.category === category) ??
+      defaultMaterials[0] ??
+      null
+    );
+  }
+
+  function pickFinish(type: string | null | undefined) {
+    if (!type) return defaultFinishes[0] ?? null;
+    return (
+      defaultFinishes.find(f => f.type === type) ??
+      defaultFinishes[0] ??
+      null
+    );
+  }
+
+  // ── 2. Calcular todos los datos ANTES de tocar la DB ─────────────────────
+  // Pre-generamos los IDs de componentes con cuid2 para poder referenciarlos
+  // en los edges sin depender del orden de inserción.
+
+  const componentRows: ComponentRow[] = [];
+  const edgeRows:      EdgeRow[]      = [];
+  const supplyRows:    SupplyRow[]    = [];
+
   let totalBoardArea = 0;
 
-  // ── Acumular datos para batch inserts ─────────────────────────────────────
-  const componentsData: Parameters<typeof db.quoteItemComponent.createMany>[0]["data"] = [];
-  const edgesData: Parameters<typeof db.componentEdge.createMany>[0]["data"] = [];
-  const suppliesData: Parameters<typeof db.quoteItemSupply.createMany>[0]["data"] = [];
-
-  for (let componentIdx = 0; componentIdx < templates.length; componentIdx++) {
-    const tmpl = templates[componentIdx];
-    const compW = evalFormula(tmpl.widthFormula, W, H, D);
-    const compH = evalFormula(tmpl.heightFormula, W, H, D);
+  for (const tmpl of templates) {
+    const compW = evalFormula(tmpl.widthFormula,      W, H, D);
+    const compH = evalFormula(tmpl.heightFormula,     W, H, D);
+    // depthFormula tiene @default("D") en el schema — siempre existe
     const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D);
 
     const areaM2 = (compW * compH * tmpl.quantity) / 10_000;
     totalBoardArea += areaM2;
 
-    const mat = pickDefault(defaultMaterials, tmpl.defaultMaterialCategory as MaterialCategory);
-    const fin = pickDefault(defaultFinishes, tmpl.defaultSurfaceFinishType as SurfaceFinishType);
+    const mat = pickMaterial(tmpl.defaultMaterialCategory as MaterialCategory | null);
+    const fin = pickFinish(tmpl.defaultSurfaceFinishType as SurfaceFinishType | null);
 
-    const boardPrice = mat ? Number(mat.pricePerM2) * areaM2 : 0;
-    const finishPrice = fin ? Number(fin.pricePerM2) * areaM2 : 0;
-    const unitPrice = boardPrice + finishPrice;
+    const boardPrice  = mat ? Number(mat.pricePerM2)  * areaM2 : 0;
+    const finishPrice = fin ? Number(fin.pricePerM2)  * areaM2 : 0;
+    const unitPrice   = boardPrice + finishPrice;
 
-    componentsData.push({
+    // Pre-generar ID del componente para poder enlazar edges
+    const componentId = createId();
+
+    componentRows.push({
+      id:              componentId,
       quoteItemId,
-      componentType: tmpl.componentType as ComponentType,
-      label: tmpl.label,
-      widthCm: compW,
-      heightCm: compH,
-      thicknessMM: tmpl.thicknessMM,
-      quantity: tmpl.quantity,
-      materialId: mat?.id ?? null,
+      componentType:   tmpl.componentType as ComponentType,
+      label:           tmpl.label ?? null,
+      widthCm:         compW,
+      heightCm:        compH,
+      thicknessMM:     tmpl.thicknessMM,
+      quantity:        tmpl.quantity,
+      materialId:      mat?.id ?? null,
       surfaceFinishId: fin?.id ?? null,
-      boardAreaM2: areaM2,
-      finishAreaM2: areaM2,
-      unitPrice: new Decimal(unitPrice),
-      totalPrice: new Decimal(unitPrice * tmpl.quantity),
+      boardAreaM2:     areaM2,
+      finishAreaM2:    areaM2,
+      unitPrice:       new Decimal(unitPrice),
+      totalPrice:      new Decimal(unitPrice * tmpl.quantity),
     });
 
-    // ── Acumular datos de cantos ───────────────────────────────────────────
+    // ── Cantos visibles de este componente ──────────────────────────────────
     if (defaultEdge) {
-      const edgeSides: Array<{ side: "TOP" | "BOTTOM" | "LEFT" | "RIGHT"; len: number; active: boolean }> = [
-        { side: "TOP", len: compW / 100, active: tmpl.topEdge },
+      const edgeDefs: Array<{ side: EdgeSide; len: number; active: boolean }> = [
+        { side: "TOP",    len: compW / 100, active: tmpl.topEdge    },
         { side: "BOTTOM", len: compW / 100, active: tmpl.bottomEdge },
-        { side: "LEFT", len: compH / 100, active: tmpl.leftEdge },
-        { side: "RIGHT", len: compH / 100, active: tmpl.rightEdge },
+        { side: "LEFT",   len: compH / 100, active: tmpl.leftEdge   },
+        { side: "RIGHT",  len: compH / 100, active: tmpl.rightEdge  },
       ];
 
-      for (const { side, len, active } of edgeSides) {
-        if (!active) continue;
-        const edgePrice = Number(defaultEdge.pricePerML) * len;
-        edgesData.push({
-          componentId: `temp_${componentIdx}`,
+      for (const { side, len, active } of edgeDefs) {
+        if (!active || len <= 0) continue;
+        edgeRows.push({
+          id:              createId(),   // ID estable pre-generado
+          componentId,                   // referencia directa, no tempId
           edgeTreatmentId: defaultEdge.id,
-          edgeSide: side,
-          lengthML: len,
-          unitPrice: new Decimal(defaultEdge.pricePerML),
-          totalPrice: new Decimal(edgePrice),
+          edgeSide:        side,
+          lengthML:        len,
+          unitPrice:       new Decimal(defaultEdge.pricePerML),
+          totalPrice:      new Decimal(Number(defaultEdge.pricePerML) * len),
         });
       }
     }
   }
 
-  // ── Acumular datos de insumos ──────────────────────────────────────────
-  for (const supply of supplies) {
+  // ── Insumos de ensamble automáticos ──────────────────────────────────────
+  for (const supply of autoSupplies) {
     if (!supply.autoCalcRule) continue;
-    const qty = calcSupplyQty(supply.autoCalcRule, templates.length, totalBoardArea);
+    const qty   = calcSupplyQty(supply.autoCalcRule, templates.length, totalBoardArea);
     const total = Number(supply.pricePerUnit) * qty;
-    suppliesData.push({
+    supplyRows.push({
       quoteItemId,
       assemblySupplyId: supply.id,
-      quantity: qty,
-      unitPrice: new Decimal(supply.pricePerUnit),
-      totalPrice: new Decimal(total),
+      quantity:         qty,
+      unitPrice:        new Decimal(supply.pricePerUnit),
+      totalPrice:       new Decimal(total),
+      notes:            null,
     });
   }
 
-  // ── Ejecutar TODAS las inserciones en UNA transacción ────────────────────
+  // ── 3. Limpiar + insertar en UNA transacción atómica ─────────────────────
   await db.$transaction(async (tx) => {
-    // 1. Crear todos los componentes
-    if (componentsData.length > 0) {
-      await tx.quoteItemComponent.createMany({ data: componentsData });
-    }
 
-    // 2. Obtener IDs de componentes recién creados (en orden)
-    const createdComponents = await tx.quoteItemComponent.findMany({
-      where: { quoteItemId },
-      orderBy: { id: "asc" },
-      select: { id: true },
+    // Limpiar datos anteriores (orden importa: edges antes que components)
+    await tx.componentEdge.deleteMany({
+      where: { component: { quoteItemId } },
     });
+    await tx.quoteItemComponent.deleteMany({ where: { quoteItemId } });
+    await tx.hardwareItem.deleteMany({      where: { quoteItemId } });
+    await tx.quoteItemSupply.deleteMany({   where: { quoteItemId } });
 
-    // 3. Mapear edges con los componentes reales
-    const realEdgesData = edgesData.map((edge) => {
-      const componentIdx = parseInt(edge.componentId.split("_")[1]);
-      return {
-        ...edge,
-        componentId: createdComponents[componentIdx]?.id ?? "",
-      };
-    }).filter(e => e.componentId);
-
-    if (realEdgesData.length > 0) {
-      await tx.componentEdge.createMany({ data: realEdgesData as any });
+    // Insertar en batch — IDs pre-generados evitan el problema de orden
+    if (componentRows.length > 0) {
+      await tx.quoteItemComponent.createMany({ data: componentRows });
     }
 
-    // 4. Crear insumos
-    if (suppliesData.length > 0) {
-      await tx.quoteItemSupply.createMany({ data: suppliesData });
+    if (edgeRows.length > 0) {
+      await tx.componentEdge.createMany({ data: edgeRows });
+    }
+
+    if (supplyRows.length > 0) {
+      await tx.quoteItemSupply.createMany({ data: supplyRows });
     }
   });
 
-  // ── Recalcular precios del QuoteItem
+  // ── 4. Recalcular precios (fuera de la transacción para no bloquear) ──────
   await pricingService.recalculateQuoteItem(quoteItemId);
 }
 

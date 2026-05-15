@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 // src/server/services/catalog-import.service.ts
 //
 // Copia items del catálogo global (Catalog.isGlobal=true, isTemplate=true)
