@@ -1,4 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { KitchenObject } from "./KitchenObject";
+import * as THREE from "three"
 
 export class WallPanel extends KitchenObject {
   protected build() {

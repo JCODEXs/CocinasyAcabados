@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { api }               from "@/trpc/server";
 import { notFound }          from "next/navigation";
 import { serializeDecimals } from "@/server/lib/serialize";
