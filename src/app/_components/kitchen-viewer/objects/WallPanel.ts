@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { KitchenObject } from "./KitchenObject";
+import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
 import * as THREE from "three"
 
 export class WallPanel extends KitchenObject {
+  
+  constructor(params: KitchenObjectParams) {
+    super(params);
+
+    this.initialize();}
   protected build() {
     const { W, H, D } = this;
     const bd = this.defaultBoardMat();

@@ -3,6 +3,11 @@ import * as THREE from "three";
 import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
 
 export class LowerCabinet extends KitchenObject {
+   constructor(params: KitchenObjectParams) {
+    super(params);
+
+    this.initialize();
+  }
   protected build() {
     const { W, H, D } = this;
     const bd = this.defaultBoardMat();
@@ -61,5 +66,6 @@ export class LowerCabinet extends KitchenObject {
     // ── Mesón ────────────────────────────────────────────────────────────
     this.addBox(W + 0.02, TOP_H, D + 0.04, ct,
       0, H - TOP_H/2, 0.02, "countertop");
+     
   }
 }

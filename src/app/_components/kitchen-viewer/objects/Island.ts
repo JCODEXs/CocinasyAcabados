@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { KitchenObject } from "./KitchenObject";
+import type  { KitchenObjectParams } from "./KitchenObject";
 
 export class Island extends KitchenObject {
+   constructor(params: KitchenObjectParams) {
+    super(params);
+
+    this.initialize();
+  }
   protected build() {
     const { W, H, D } = this;
     const bd = this.defaultBoardMat();
@@ -59,5 +65,6 @@ export class Island extends KitchenObject {
 
     // Mesón (granito o cuarzo)
     this.addBox(W + 0.06, TOP_H, D + 0.06, ct, 0, H - TOP_H/2, 0, "countertop");
+    
   }
 }

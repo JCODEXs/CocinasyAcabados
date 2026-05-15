@@ -43,10 +43,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-2">
-              <div className="mx-auto  flex h-20 w-50 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-3xl shadow-lg">
-            <img src="/logo.png" alt="Logo" className="h20 w-40  rounded-xl" />
+              <div className="mx-auto  flex h-20 w-80 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-3xl shadow-lg">
+            <img src="/logo.png" alt="Logo" className="h28 w-80  rounded-xl" />
           </div>
-              <span className="font-semibold text-slate-800 text-lg">Cocinas<span className="text-slate-400"> y Acabados</span></span>
+              {/* <span className="font-semibold text-slate-800 text-lg">Cocinas<span className="text-slate-400"> y Acabados</span></span> */}
             </div>
             <div className="flex items-center space-x-4">
               <Link 

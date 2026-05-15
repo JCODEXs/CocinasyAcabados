@@ -15,6 +15,7 @@ export class UpperCabinet extends KitchenObject {
   constructor(params: UpperCabinetParams) {
     super(params);
     this.extraParams = params;
+    this.initialize()
   }
 
   protected build() {
