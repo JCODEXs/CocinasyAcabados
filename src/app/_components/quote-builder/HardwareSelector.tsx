@@ -20,7 +20,7 @@ export function HardwareSelector({ quoteItemId, hardwareItems }: {
   quoteItemId: string;
   hardwareItems: HardwareItem[];
 }) {
-  const { invalidate } = useQuoteBuilder();
+  const { invalidateProject } = useQuoteBuilder();
   const [adding, setAdding] = useState(false);
   const [selectedHardwareId, setSelectedHardwareId] = useState("");
   const [qty, setQty] = useState(1);
@@ -29,9 +29,9 @@ export function HardwareSelector({ quoteItemId, hardwareItems }: {
   gcTime:    30 * 60 * 1000, });
 
   const upsert = api.quotes.upsertHardwareItem.useMutation({
-    onSuccess: () => { setAdding(false); setSelectedHardwareId(""); setQty(1); invalidate(); },
+    onSuccess: async() => { setAdding(false); setSelectedHardwareId(""); setQty(1); await invalidateProject(); },
   });
-  const remove = api.quotes.removeHardwareItem.useMutation({ onSuccess: invalidate });
+  const remove = api.quotes.removeHardwareItem.useMutation({ onSuccess: invalidateProject });
 
  const Chardware: Hardware[] | undefined = catalog?.hardware;
 

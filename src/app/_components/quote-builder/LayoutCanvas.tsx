@@ -19,12 +19,12 @@ const GROUP_TYPE_LABELS: Record<string, string> = {
 
 export function LayoutCanvas() {
   const { project, projectId, invalidateProject } = useQuoteBuilder();
-  if (!project) return null;
   const [view, setView] = useState<View>("list");
   const [creatingGroup, setCreatingGroup] = useState(false);
+  if (!project) return null;
 
   const createGroup = api.layout.createGroup.useMutation({
-    onSuccess: () => { setCreatingGroup(false); invalidate(); },
+    onSuccess: async() => { setCreatingGroup(false); await invalidateProject(); },
   });
 
   const handleCreateGroup = (type: GroupType) => {

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
@@ -62,7 +64,7 @@ interface Props {
 
 export function FloorPlanView({ project }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { select, selection, invalidate } = useQuoteBuilder();
+  const { select, selection, invalidateProject } = useQuoteBuilder();
 
   const [view, setView] = useState<ViewState>({ zoom: 1, panX: 40, panY: 40 });
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -70,7 +72,7 @@ export function FloorPlanView({ project }: Props) {
   const [showDims, setShowDims] = useState(false);
   const [showConn, setShowConn] = useState(true);
 
-  const moveGroup = api.layout.updateGroup.useMutation({ onSuccess: invalidate });
+  const moveGroup = api.layout.updateGroup.useMutation({ onSuccess: invalidateProject });
 
   // ─── Helpers de coordenadas ───────────────────────────────────────────────
 
@@ -127,7 +129,9 @@ export function FloorPlanView({ project }: Props) {
 
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Si el click es sobre un grupo handle → drag de grupo
-    const groupHandle = (e.target as Element).closest("[data-group-id]") as SVGElement | null;
+  if (!(e.target instanceof Element)) return;
+  
+  const groupHandle = e.target.closest("[data-group-id]") as SVGElement | null;
     if (groupHandle) {
       const groupId = groupHandle.dataset.groupId!;
       const group = project.layoutGroups.find(g => g.id === groupId);
