@@ -15,8 +15,16 @@ type Catalog = RouterOutputs["catalog"]["getFullCatalog"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// maximumFractionDigits: 0 garantiza que tanto el servidor (Node.js) como el
+// cliente (browser) redondeen al entero más cercano, eliminando el hydration
+// mismatch donde Node renderizaba "$ 5.940.920,54" y el browser "$ 5.940.921".
 const COP = (n: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
 
 // ─── Panel principal ──────────────────────────────────────────────────────────
 

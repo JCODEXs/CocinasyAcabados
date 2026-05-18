@@ -219,34 +219,60 @@ export const quotesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      // Verificar dueño antes de escribir
+      // 1. Auth — un fetch con join en lugar de assertProjectOwner separado
       const existing = await db.quoteItem.findUnique({
-        where:   { id },
-        select:  { projectId: true, layoutGroupId: true, project: { select: { userId: true } } },
+        where:  { id },
+        select: { projectId: true, layoutGroupId: true, project: { select: { userId: true } } },
       });
-      if ( existing?.project.userId !== ctx.session.user.id) {
+      if (existing?.project.userId !== ctx.session.user.id) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
+      // 2. Actualizar dimensiones/campos del item
       await db.quoteItem.update({ where: { id }, data });
 
       const dimensionsChanged =
-        data.width !== undefined ||
-        data.height !== undefined ||
-        data.depth !== undefined;
+        data.width !== undefined || data.height !== undefined || data.depth !== undefined;
 
+      // 3. Si cambian dimensiones, regenerar BOM (transacción interna propia)
       if (dimensionsChanged) {
         await bomService.instantiateBOM(id);
       }
 
-      await Promise.all([
-        pricingService.recalculateProject(existing.projectId),
+      // 4. Recalcular precios (item + proyecto) en una sola transacción
+      //    y ejecutar recalcGroupPositions en paralelo (no bloquea precios)
+      const [projectTotals] = await Promise.all([
+        db.$transaction(async (tx) => {
+          const itemPrices = await pricingService.recalculateQuoteItem(id, tx);
+          const projTotals = await pricingService.recalculateProject(existing.projectId, tx);
+          return { itemPrices, projTotals };
+        }, { timeout: 30000 }),
         existing.layoutGroupId
           ? layoutService.recalculateGroupPositions(existing.layoutGroupId)
           : Promise.resolve(),
       ]);
 
-      return db.quoteItem.findUniqueOrThrow({ where: { id } });
+      // 5. Devolver item completo con todo lo que el frontend necesita (sin refetch)
+      const updatedItem = await db.quoteItem.findUniqueOrThrow({
+        where:   { id },
+        include: {
+          elementType:  true,
+          components: {
+            include: {
+              material:     true,
+              surfaceFinish:true,
+              edges:        { include: { edgeTreatment: true } },
+            },
+          },
+          hardwareItems:{ include: { hardware: true } },
+          supplies:     { include: { assemblySupply: true } },
+        },
+      });
+
+      return {
+        item:    updatedItem,
+        project: projectTotals.projTotals,
+      };
     }),
 
   deleteQuoteItem: protectedProcedure
@@ -260,14 +286,19 @@ export const quotesRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
+      // Eliminar item — la cascade en el schema borra componentes y edges automáticamente
       await db.quoteItem.delete({ where: { id: input.id } });
 
-      await Promise.all([
+      // Recalcular proyecto y posiciones en paralelo (item ya fue eliminado antes de esto)
+      const [projectTotals] = await Promise.all([
         pricingService.recalculateProject(item.projectId),
         item.layoutGroupId
           ? layoutService.recalculateGroupPositions(item.layoutGroupId)
           : Promise.resolve(),
       ]);
+
+      // Retornar totales actualizados para que el cliente no necesite refetch
+      return { project: projectTotals };
     }),
 
   // Endpoint ultra-rápido para actualizar posición 3D desde el drag del visor
@@ -296,10 +327,10 @@ export const quotesRouter = createTRPCRouter({
   updateComponent: protectedProcedure
     .input(updateComponentSchema)
     .mutation(async ({ ctx, input }) => {
-      // Un solo fetch con todo lo necesario para autorización y cálculo
+      // 1. Auth + datos base del componente — un solo fetch con joins
       const component = await db.quoteItemComponent.findUnique({
-        where:   { id: input.componentId },
-        select:  {
+        where:  { id: input.componentId },
+        select: {
           boardAreaM2:  true,
           finishAreaM2: true,
           quantity:     true,
@@ -309,45 +340,69 @@ export const quotesRouter = createTRPCRouter({
           },
         },
       });
-      if ( component?.quoteItem.project.userId !== ctx.session.user.id) {
+      if (component?.quoteItem.project.userId !== ctx.session.user.id) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      // Fetch paralelo de material y acabado
+      const { quoteItemId, quoteItem: { projectId } } = component;
+
+      // 2. Precios de material y acabado en paralelo
       const [mat, fin] = await Promise.all([
         input.materialId
           ? db.material.findUnique({ where: { id: input.materialId }, select: { pricePerM2: true } })
-          : null,
+          : Promise.resolve(null),
         input.surfaceFinishId
           ? db.surfaceFinish.findUnique({ where: { id: input.surfaceFinishId }, select: { pricePerM2: true } })
-          : null,
+          : Promise.resolve(null),
       ]);
 
-      const unitPrice =
-        Number(mat?.pricePerM2 ?? 0) * component.boardAreaM2 +
-        Number(fin?.pricePerM2 ?? 0) * component.finishAreaM2;
+      const compUnit  = Number(mat?.pricePerM2 ?? 0) * component.boardAreaM2
+                      + Number(fin?.pricePerM2 ?? 0) * component.finishAreaM2;
+      const compTotal = compUnit * component.quantity;
 
-      await db.quoteItemComponent.update({
-        where: { id: input.componentId },
-        data:  {
-          materialId:     input.materialId,
-          surfaceFinishId:input.surfaceFinishId,
-          unitPrice:      new Decimal(unitPrice),
-          totalPrice:     new Decimal(unitPrice * component.quantity),
-        },
-      });
+      // 3. Una sola transacción: actualiza componente → recalcula item → recalcula proyecto
+      //    Dentro de $transaction, Postgres ve todos los writes del mismo tx, lo que
+      //    elimina el problema de lecturas inconsistentes y reduce round-trips al mínimo.
+      const { itemPrices, projectTotals, updatedComponent } = await db.$transaction(async (tx) => {
+        // 3a. Actualizar componente
+        const updComp = await tx.quoteItemComponent.update({
+          where:   { id: input.componentId },
+          data:    {
+            materialId:      input.materialId,
+            surfaceFinishId: input.surfaceFinishId,
+            unitPrice:       new Decimal(compUnit),
+            totalPrice:      new Decimal(compTotal),
+          },
+          include: {
+            material:     true,
+            surfaceFinish:true,
+            edges:        { include: { edgeTreatment: true } },
+          },
+        });
 
-      // Recalculos en serie porque pricing del item → pricing del proyecto
-      await pricingService.recalculateQuoteItem(component.quoteItemId);
-      await pricingService.recalculateProject(component.quoteItem.projectId);
+        // 3b. Recalcular item (lee componentes ya actualizados en esta tx)
+        const itemPrices = await pricingService.recalculateQuoteItem(quoteItemId, tx);
+
+        // 3c. Recalcular proyecto (lee items ya actualizados en esta tx)
+        const projectTotals = await pricingService.recalculateProject(projectId, tx);
+
+        return { itemPrices, projectTotals, updatedComponent: updComp };
+      }, { timeout: 30000 });
+
+      return {
+        component:    updatedComponent,
+        item:         { id: quoteItemId, ...itemPrices },
+        project:      projectTotals,
+      };
     }),
 
   updateEdge: protectedProcedure
     .input(updateEdgeSchema)
     .mutation(async ({ ctx, input }) => {
+      // 1. Auth + datos del canto en un solo fetch
       const edge = await db.componentEdge.findUnique({
-        where:   { id: input.edgeId },
-        select:  {
+        where:  { id: input.edgeId },
+        select: {
           lengthML:    true,
           componentId: true,
           component: {
@@ -364,23 +419,38 @@ export const quotesRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
+      const { componentId, component: { quoteItemId, quoteItem: { projectId } } } = edge;
+
+      // 2. Precio del tratamiento
       const treatment = await db.edgeTreatment.findUniqueOrThrow({
         where:  { id: input.edgeTreatmentId },
         select: { pricePerML: true },
       });
-      const totalPrice = Number(treatment.pricePerML) * edge.lengthML;
+      const edgeTotalPrice = Number(treatment.pricePerML) * edge.lengthML;
 
-      await db.componentEdge.update({
-        where: { id: input.edgeId },
-        data:  {
-          edgeTreatmentId: input.edgeTreatmentId,
-          unitPrice:       treatment.pricePerML,
-          totalPrice:      new Decimal(totalPrice),
-        },
-      });
+      // 3. Una sola transacción: actualiza canto → recalcula item → recalcula proyecto
+      const { itemPrices, projectTotals, updatedEdge } = await db.$transaction(async (tx) => {
+        const updEdge = await tx.componentEdge.update({
+          where: { id: input.edgeId },
+          data:  {
+            edgeTreatmentId: input.edgeTreatmentId,
+            unitPrice:       treatment.pricePerML,
+            totalPrice:      new Decimal(edgeTotalPrice),
+          },
+          include: { edgeTreatment: true },
+        });
 
-      await pricingService.recalculateQuoteItem(edge.component.quoteItemId);
-      await pricingService.recalculateProject(edge.component.quoteItem.projectId);
+        const itemPrices    = await pricingService.recalculateQuoteItem(quoteItemId, tx);
+        const projectTotals = await pricingService.recalculateProject(projectId, tx);
+
+        return { itemPrices, projectTotals, updatedEdge: updEdge };
+      }, { timeout: 30000 });
+
+      return {
+        edge:       { ...updatedEdge, componentId },
+        item:       { id: quoteItemId, ...itemPrices },
+        project:    projectTotals,
+      };
     }),
 
   // ── Herrajes ────────────────────────────────────────────────────────────────

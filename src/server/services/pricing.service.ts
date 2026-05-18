@@ -1,14 +1,19 @@
 import { db } from "@/server/db";
 import { Decimal } from "@prisma/client/runtime/library";
+import type { PrismaClient } from "@prisma/client";
 
-async function recalculateQuoteItem(quoteItemId: string): Promise<void> {
+// Tipo compatible con PrismaClient y con el cliente de $transaction interactivo
+type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+
+// ─── Retorna los precios calculados; actualiza el QuoteItem en la BD ──────────
+async function recalculateQuoteItem(
+  quoteItemId: string,
+  tx: TxClient = db,
+): Promise<{ unitPrice: number; totalPrice: number }> {
   const [components, hardwareItems, supplies] = await Promise.all([
-    db.quoteItemComponent.findMany({
-      where: { quoteItemId },
-      include: { edges: true },
-    }),
-    db.hardwareItem.findMany({ where: { quoteItemId } }),
-    db.quoteItemSupply.findMany({ where: { quoteItemId } }),
+    tx.quoteItemComponent.findMany({ where: { quoteItemId }, include: { edges: true } }),
+    tx.hardwareItem.findMany({ where: { quoteItemId } }),
+    tx.quoteItemSupply.findMany({ where: { quoteItemId } }),
   ]);
 
   const componentTotal = components.reduce((acc, c) => {
@@ -17,43 +22,55 @@ async function recalculateQuoteItem(quoteItemId: string): Promise<void> {
   }, 0);
 
   const hardwareTotal = hardwareItems.reduce((acc, h) => acc + Number(h.totalPrice), 0);
-  const supplyTotal = supplies.reduce((acc, s) => acc + Number(s.totalPrice), 0);
+  const supplyTotal   = supplies.reduce((acc, s)       => acc + Number(s.totalPrice), 0);
 
   const unitPrice = componentTotal + hardwareTotal + supplyTotal;
 
-  const item = await db.quoteItem.findUniqueOrThrow({ where: { id: quoteItemId } });
+  const item = await tx.quoteItem.findUniqueOrThrow({
+    where:  { id: quoteItemId },
+    select: { quantity: true },
+  });
   const totalPrice = unitPrice * item.quantity;
 
-  await db.quoteItem.update({
+  await tx.quoteItem.update({
     where: { id: quoteItemId },
-    data: { unitPrice: new Decimal(unitPrice), totalPrice: new Decimal(totalPrice) },
+    data:  { unitPrice: new Decimal(unitPrice), totalPrice: new Decimal(totalPrice) },
   });
+
+  return { unitPrice, totalPrice };
 }
 
-async function recalculateProject(projectId: string): Promise<void> {
+// ─── Retorna los totales calculados; actualiza el Project en la BD ────────────
+async function recalculateProject(
+  projectId: string,
+  tx: TxClient = db,
+): Promise<{ subtotal: number; tax: number; total: number }> {
   const [items, finishes] = await Promise.all([
-    db.quoteItem.findMany({ where: { projectId } }),
-    db.projectFinish.findMany({ where: { projectId } }),
+    tx.quoteItem.findMany({ where: { projectId }, select: { totalPrice: true } }),
+    tx.projectFinish.findMany({ where: { projectId }, select: { totalPrice: true } }),
   ]);
 
-  const itemsTotal = items.reduce((acc, i) => acc + Number(i.totalPrice), 0);
-  const finishesTotal = finishes.reduce((acc, f) => acc + Number(f.totalPrice), 0);
-  const subtotal = itemsTotal + finishesTotal;
+  const subtotal = [
+    ...items.map(i => Number(i.totalPrice)),
+    ...finishes.map(f => Number(f.totalPrice)),
+  ].reduce((acc, v) => acc + v, 0);
 
-  const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
-  // tax puede ser un campo configurable en el futuro; por ahora 0 o 19% IVA
-  const taxRate = 0; // cambiar a 0.19 cuando se requiera IVA
-  const tax = subtotal * taxRate;
+  // taxRate configurable en el futuro (IVA 19% → 0.19)
+  const taxRate = 0;
+  const tax     = subtotal * taxRate;
+  const total   = subtotal + tax;
 
-  await db.project.update({
+  await tx.project.update({
     where: { id: projectId },
-    data: {
-      subtotal: new Decimal(subtotal),
-      tax: new Decimal(tax),
-      total: new Decimal(subtotal + tax),
-      updatedAt: new Date(),
+    data:  {
+      subtotal:   new Decimal(subtotal),
+      tax:        new Decimal(tax),
+      total:      new Decimal(total),
+      updatedAt:  new Date(),
     },
   });
+
+  return { subtotal, tax, total };
 }
 
 export const pricingService = { recalculateQuoteItem, recalculateProject };

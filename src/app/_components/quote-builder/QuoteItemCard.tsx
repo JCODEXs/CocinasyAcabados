@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { useState } from "react";
@@ -17,8 +16,8 @@ import {
 type QuoteItem = RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number];
 
 export function QuoteItemCard({ item }: { item: QuoteItem }) {
-  const { invalidateProject } = useQuoteBuilder();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const { projectId, invalidateProject } = useQuoteBuilder();
+  const utils = api.useUtils();
   const { updateDimension, isPending } = useOptimisticItem(item.id);
 
   // Pure UI state — fine to be local
@@ -26,7 +25,52 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
   const [activeTab,  setActiveTab]  = useState<"components" | "hardware" | "supplies">("components");
 
   const deleteItem = api.quotes.deleteQuoteItem.useMutation({
-    onSuccess: invalidateProject,
+    onMutate: async () => {
+      await utils.quotes.getProject.cancel({ id: projectId });
+      const snapshot = utils.quotes.getProject.getData({ id: projectId });
+
+      // Eliminar el item del cache inmediatamente y recalcular totales localmente
+      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+        if (!old) return old;
+        const newGroups = old.layoutGroups.map(g => ({
+          ...g,
+          items: g.items.filter(i => i.id !== item.id),
+        }));
+        const newSubtotal =
+          newGroups.flatMap(g => g.items).reduce((acc, i) => acc + Number(i.totalPrice), 0) +
+          old.projectFinishes.reduce((acc, f) => acc + Number(f.totalPrice), 0);
+
+        return {
+          ...old,
+          layoutGroups: newGroups,
+          subtotal: newSubtotal as unknown as typeof old.subtotal,
+          total:    newSubtotal as unknown as typeof old.total,
+        };
+      });
+
+      return { snapshot };
+    },
+
+    onError: (_err, _vars, context) => {
+      if (context?.snapshot) {
+        utils.quotes.getProject.setData({ id: projectId }, context.snapshot);
+      }
+    },
+
+    onSuccess: (result) => {
+      // Actualizar totales reales del servidor (incluye decimales exactos de BD)
+      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          subtotal: result.project.subtotal as unknown as typeof old.subtotal,
+          tax:      result.project.tax      as unknown as typeof old.tax,
+          total:    result.project.total    as unknown as typeof old.total,
+        };
+      });
+      // Safety net — sincronizar posiciones del grupo en background
+      void invalidateProject();
+    },
   });
 
   return (

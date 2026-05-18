@@ -95,7 +95,7 @@ function recalculateComponents(
 
 export function useOptimisticItem(itemId: string) {
   const utils = api.useUtils();
-  const { projectId, catalog, refetchProject } = useQuoteBuilder();
+  const { projectId, catalog, invalidateProject } = useQuoteBuilder();
 
   const applyOptimistic = useCallback(
     (patch: DimensionPatch) => {
@@ -158,10 +158,29 @@ export function useOptimisticItem(itemId: string) {
       }
     },
 
-    onSettled: async () => {
-      // Refetch trae los componentes recalculados por el servidor (BOM real)
-      // Esto corrige cualquier diferencia entre la estimación optimista y el servidor
-      await refetchProject();
+    onSuccess: (result) => {
+      // Reemplazar el item completo con los datos reales del servidor:
+      // componentes recalculados por BOM, precios definitivos, sin refetch.
+      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          subtotal: result.project.subtotal as unknown as typeof old.subtotal,
+          tax:      result.project.tax      as unknown as typeof old.tax,
+          total:    result.project.total    as unknown as typeof old.total,
+          layoutGroups: old.layoutGroups.map(group => ({
+            ...group,
+            items: group.items.map(item =>
+              item.id !== result.item.id
+                ? item
+                : { ...item, ...result.item }
+            ),
+          })),
+        };
+      });
+
+      // Invalidar en background como safety net (no bloquea la UI)
+      void invalidateProject();
     },
   });
 

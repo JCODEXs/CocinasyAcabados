@@ -17,7 +17,7 @@ const COMPONENT_LABELS: Record<string, string> = {
 };
 
 export function ComponentEditor({ component }: { component: Component }) {
-  const { catalog, refetchProject } = useQuoteBuilder();
+  const { catalog } = useQuoteBuilder();
   const { updateComponent, isPending } = useOptimisticComponent(component.id);
 
   // component prop comes from cache — always up to date after optimistic update
@@ -132,13 +132,16 @@ export function ComponentEditor({ component }: { component: Component }) {
 function EdgeRow({ edge }: {
   edge: RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number]["components"][number]["edges"][number];
 }) {
-  const { catalog, projectId, refetchProject } = useQuoteBuilder();
+  const { catalog, projectId, invalidateProject } = useQuoteBuilder();
   const utils = api.useUtils();
 
   const updateEdge = api.quotes.updateEdge.useMutation({
     onMutate: async (variables) => {
       await utils.quotes.getProject.cancel({ id: projectId });
       const snapshot = utils.quotes.getProject.getData({ id: projectId });
+
+      // Optimistic: actualizar edgeTreatmentId y nombre visualmente desde el catálogo
+      const newTreatment = catalog?.edgeTreatments.find(et => et.id === variables.edgeTreatmentId);
 
       utils.quotes.getProject.setData({ id: projectId }, (old) => {
         if (!old) return old;
@@ -154,6 +157,11 @@ function EdgeRow({ edge }: {
                   e.id !== edge.id ? e : {
                     ...e,
                     edgeTreatmentId: variables.edgeTreatmentId,
+                    edgeTreatment:   newTreatment ?? e.edgeTreatment,
+                    // Precio optimista: pricePerML × lengthML
+                    totalPrice: newTreatment
+                      ? (Number(newTreatment.pricePerML) * e.lengthML) as unknown as typeof e.totalPrice
+                      : e.totalPrice,
                   }
                 ),
               })),
@@ -167,7 +175,37 @@ function EdgeRow({ edge }: {
     onError: (_err, _vars, ctx) => {
       if (ctx?.snapshot) utils.quotes.getProject.setData({ id: projectId }, ctx.snapshot);
     },
-    onSettled: refetchProject,
+    onSuccess: (result) => {
+      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          subtotal: result.project.subtotal as unknown as typeof old.subtotal,
+          tax:      result.project.tax      as unknown as typeof old.tax,
+          total:    result.project.total    as unknown as typeof old.total,
+          layoutGroups: old.layoutGroups.map(g => ({
+            ...g,
+            items: g.items.map(item => {
+              if (item.id !== result.item.id) return item;
+              return {
+                ...item,
+                unitPrice:  result.item.unitPrice  as unknown as typeof item.unitPrice,
+                totalPrice: result.item.totalPrice as unknown as typeof item.totalPrice,
+                components: item.components.map(comp =>
+                  comp.id !== result.edge.componentId ? comp : {
+                    ...comp,
+                    edges: comp.edges.map(e =>
+                      e.id !== result.edge.id ? e : { ...e, ...result.edge }
+                    ),
+                  }
+                ),
+              };
+            }),
+          })),
+        };
+      });
+      void invalidateProject();
+    },
   });
 
   const sideLabel: Record<string, string> = {
