@@ -8,7 +8,7 @@ import type { RouterOutputs } from "@/trpc/react";
 import { LowerCabinet }  from "./objects/LowerCabinet";
 import { UpperCabinet }  from "./objects/UpperCabinet";
 import { Island }        from "./objects/Island";
-// import { Appliance }     from "../../../../../Appliance";
+import { Appliance }     from "./objects/Appliance";
 import { WallPanel }     from "./objects/WallPanel";
 import { KitchenObject, type KitchenObjectParams, type MaterialConfig } from "./objects/KitchenObject";
 
@@ -82,7 +82,7 @@ class KitchenObjectFactory {
 KitchenObjectFactory.register("MUEBLE_BAJO",      LowerCabinet as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("MUEBLE_ALTO",      UpperCabinet as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("MESON",            LowerCabinet as unknown as KitchenObjectCtor);
-// KitchenObjectFactory.register("ELECTRODOMESTICO", Appliance    as unknown as KitchenObjectCtor);
+KitchenObjectFactory.register("ELECTRODOMESTICO", Appliance    as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("PANEL_YESO",       WallPanel    as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("SUPERBOARD",       WallPanel    as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("PUERTA",           WallPanel    as unknown as KitchenObjectCtor);

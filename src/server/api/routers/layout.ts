@@ -39,18 +39,59 @@ export const layoutRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const group = await db.layoutGroup.findUniqueOrThrow({
-        where: { id: input.id },
-        include: { project: true },
+        where:  { id: input.id },
+        select: { project: { select: { userId: true } } },
       });
       if (group.project.userId !== ctx.session.user.id) throw new TRPCError({ code: "FORBIDDEN" });
 
       const { id, ...data } = input;
-      await db.layoutGroup.update({ where: { id }, data });
+      const needsRecalc =
+        data.startX !== undefined || data.startY !== undefined || data.baseAngle !== undefined;
 
-      // Recalcular posiciones si cambia origen o ángulo
-      if (data.startX !== undefined || data.startY !== undefined || data.baseAngle !== undefined) {
-        await layoutService.recalculateGroupPositions(id);
-      }
+      // Una sola transacción: actualiza grupo → recalcula posiciones si aplica
+      const { updatedGroup, items } = await db.$transaction(async (tx) => {
+        const updatedGroup = await tx.layoutGroup.update({ where: { id }, data });
+        const items = needsRecalc
+          ? await layoutService.recalculateGroupPositions(id, tx)
+          : [];
+        return { updatedGroup, items };
+      }, { timeout: 30000 });
+
+      return { group: updatedGroup, items };
+    }),
+
+  // Crear giro en L: nuevo grupo posicionado al final del actual con +90° o -90°
+  createLTurn: protectedProcedure
+    .input(z.object({
+      sourceGroupId: z.string().cuid(),
+      direction:     z.enum(["LEFT", "RIGHT"]).default("RIGHT"),
+      name:          z.string().min(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const source = await db.layoutGroup.findUniqueOrThrow({
+        where:  { id: input.sourceGroupId },
+        select: { projectId: true, name: true, type: true, project: { select: { userId: true } } },
+      });
+      if (source.project.userId !== ctx.session.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Calcular endpoint del grupo origen y ángulo perpendicular
+      const endpoint = await layoutService.getGroupEndpoint(input.sourceGroupId);
+      const turnDelta = input.direction === "RIGHT" ? -90 : 90;
+      const newAngle = endpoint.angle + turnDelta;
+
+      const count = await db.layoutGroup.count({ where: { projectId: source.projectId } });
+
+      return db.layoutGroup.create({
+        data: {
+          projectId: source.projectId,
+          name:      input.name ?? `${source.name} (giro)`,
+          type:      source.type,
+          startX:    parseFloat(endpoint.x.toFixed(4)),
+          startY:    parseFloat(endpoint.z.toFixed(4)),
+          baseAngle: newAngle,
+          sortOrder: count,
+        },
+      });
     }),
 
   deleteGroup: protectedProcedure

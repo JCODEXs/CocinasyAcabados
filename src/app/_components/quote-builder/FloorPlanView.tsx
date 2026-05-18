@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { type RouterOutputs } from "@/trpc/react";
-import { api } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
 
 type Project = RouterOutputs["quotes"]["getProject"];
@@ -45,13 +43,9 @@ interface ViewState {
 }
 
 interface DragState {
-  type: "pan" | "group";
+  type: "pan";
   startMx: number;
   startMy: number;
-  // Para "group"
-  groupId?: string;
-  origStartX?: number;
-  origStartY?: number;
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -64,7 +58,7 @@ interface Props {
 
 export function FloorPlanView({ project }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { select, selection, invalidateProject } = useQuoteBuilder();
+  const { select, selection, selectedGroupId, setSelectedGroupId } = useQuoteBuilder();
 
   const [view, setView] = useState<ViewState>({ zoom: 1, panX: 40, panY: 40 });
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -72,16 +66,11 @@ export function FloorPlanView({ project }: Props) {
   const [showDims, setShowDims] = useState(false);
   const [showConn, setShowConn] = useState(true);
 
-  const moveGroup = api.layout.updateGroup.useMutation({ onSuccess: invalidateProject });
-
   // ─── Helpers de coordenadas ───────────────────────────────────────────────
 
   const s = useCallback((cm: number) => cm * BASE_SCALE * view.zoom, [view.zoom]);
   const tx = useCallback((cm: number) => WALL_PX + s(cm) + view.panX, [s, view.panX]);
   const tz = useCallback((cm: number) => WALL_PX + s(cm) + view.panY, [s, view.panY]);
-
-  // Inverso: px → cm (para drag de grupos)
-  const pxToCm = useCallback((px: number) => px / (BASE_SCALE * view.zoom), [view.zoom]);
 
   // ─── Handlers de interacción ──────────────────────────────────────────────
 
@@ -128,56 +117,31 @@ export function FloorPlanView({ project }: Props) {
   }, [handleWheel]);
 
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    // Si el click es sobre un grupo handle → drag de grupo
-  if (!(e.target instanceof Element)) return;
-  
-  const groupHandle = e.target.closest("[data-group-id]") as SVGElement | null;
+    if (!(e.target instanceof Element)) return;
+
+    // Click sobre handle de grupo → seleccionar grupo (sin drag)
+    const groupHandle = e.target.closest("[data-group-id]") as SVGElement | null;
     if (groupHandle) {
       const groupId = groupHandle.dataset.groupId!;
-      const group = project.layoutGroups.find(g => g.id === groupId);
-      if (!group) return;
-      setDrag({
-        type: "group",
-        startMx: e.clientX,
-        startMy: e.clientY,
-        groupId,
-        origStartX: group.startX,
-        origStartY: group.startY,
-      });
+      setSelectedGroupId(selectedGroupId === groupId ? null : groupId);
       e.stopPropagation();
       return;
     }
     // Sino → pan
     setDrag({ type: "pan", startMx: e.clientX, startMy: e.clientY });
-  }, [project.layoutGroups]);
+  }, [selectedGroupId, setSelectedGroupId]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!drag) return;
     const dx = e.clientX - drag.startMx;
     const dy = e.clientY - drag.startMy;
-
-    if (drag.type === "pan") {
-      setView(v => ({ ...v, panX: v.panX + dx, panY: v.panY + dy }));
-      setDrag(d => d ? { ...d, startMx: e.clientX, startMy: e.clientY } : null);
-    } else if (drag.type === "group" && drag.groupId) {
-      // Update visual instantly; commit on mouseup
-      setView(v => ({ ...v })); // force re-render via state
-    }
+    setView(v => ({ ...v, panX: v.panX + dx, panY: v.panY + dy }));
+    setDrag(d => d ? { ...d, startMx: e.clientX, startMy: e.clientY } : null);
   }, [drag]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (!drag) return;
-    if (drag.type === "group" && drag.groupId) {
-      const dx = e.clientX - drag.startMx;
-      const dy = e.clientY - drag.startMy;
-      const newStartX = (drag.origStartX ?? 0) + pxToCm(dx);
-      const newStartY = (drag.origStartY ?? 0) + pxToCm(dy);
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-        moveGroup.mutate({ id: drag.groupId, startX: newStartX, startY: newStartY });
-      }
-    }
+  const handleMouseUp = useCallback(() => {
     setDrag(null);
-  }, [drag, pxToCm, moveGroup]);
+  }, []);
 
   // Selección de item
   const handleItemClick = useCallback((e: React.MouseEvent, itemId: string) => {
@@ -304,9 +268,8 @@ export function FloorPlanView({ project }: Props) {
               tx={tx}
               tz={tz}
               s={s}
-              pxToCm={pxToCm}
-              drag={drag}
               selectedItemId={selectedItemId}
+              selectedGroupId={selectedGroupId}
               showDims={showDims}
               showConn={showConn}
               onItemClick={handleItemClick}
@@ -378,58 +341,55 @@ function RoomWalls({ tx, tz, s, roomW, roomL, showDims }: {
   );
 }
 
-function GroupLayer({ group, gIdx, tx, tz, s, pxToCm, drag, selectedItemId,
+function GroupLayer({ group, gIdx, tx, tz, s, selectedItemId, selectedGroupId,
   showDims, showConn, onItemClick }: {
   group: LayoutGroup;
   gIdx: number;
   tx: (v: number) => number;
   tz: (v: number) => number;
   s: (v: number) => number;
-  pxToCm: (v: number) => number;
-  drag: DragState | null;
   selectedItemId: string | null;
+  selectedGroupId: string | null;
   showDims: boolean;
   showConn: boolean;
   onItemClick: (e: React.MouseEvent, id: string) => void;
 }) {
   const [fill, stroke] = GROUP_PALETTE[gIdx % GROUP_PALETTE.length]!;
+  const isSelectedGroup = selectedGroupId === group.id;
 
   function expandItems(items: QuoteItem[]) {
-  return items.flatMap(item =>
-    Array.from({ length: item.quantity }).map((_, i) => ({
-      ...item,
-      instanceId: `${item.id}-${i}`,
-      // id= `${item.id}-${i}`,
-      posX: item.posX + i * (item.width + (item.gapBeforeCm ?? 0)),
-    }))
-  );
-}
+    return items.flatMap(item =>
+      Array.from({ length: item.quantity }).map((_, i) => ({
+        ...item,
+        instanceId: `${item.id}-${i}`,
+        posX: item.posX + i * (item.width + (item.gapBeforeCm ?? 0)),
+      }))
+    );
+  }
 
-  // Si este grupo está siendo arrastrado, aplicar desplazamiento visual
-  const isDraggingThis = drag?.type === "group" && drag.groupId === group.id;
-  
-
-  // const items = group.items;
-const items = expandItems(group.items);
+  const items = expandItems(group.items);
 
   return (
     <g>
-      {/* Etiqueta del grupo — también es el handle de drag */}
+      {/* Etiqueta del grupo — click para seleccionar (edición vía panel) */}
       {items.length > 0 && (() => {
         const first = items[0]!;
-        // Offset si está siendo arrastrado (solo visual; se commitea en mouseup)
         const lx = tx(first.posX);
         const lz = tz(first.posZ) - 14;
         return (
           <g
             data-group-id={group.id}
-            style={{ cursor: "move" }}
+            style={{ cursor: "pointer" }}
           >
             <rect x={lx} y={lz - 10} width={group.name.length * 6 + 12} height={14}
-              fill={fill} stroke={stroke} strokeWidth={0.5} rx={3} />
+              fill={isSelectedGroup ? stroke : fill}
+              stroke={stroke}
+              strokeWidth={isSelectedGroup ? 1.2 : 0.5}
+              rx={3} />
             <text
               x={lx + 6} y={lz - 3}
-              fontSize={9} fontFamily="system-ui" fill={stroke}
+              fontSize={9} fontFamily="system-ui"
+              fill={isSelectedGroup ? "white" : stroke}
               dominantBaseline="central" style={{ pointerEvents: "none" }}
             >
               {group.name}

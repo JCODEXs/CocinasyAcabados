@@ -28,6 +28,10 @@ const COP = (n: number) =>
 
 // ─── Panel principal ──────────────────────────────────────────────────────────
 
+// Tasa de IVA — debe coincidir con pricing.service.ts. Cuando se haga
+// configurable, leerla desde project o settings.
+const TAX_RATE = 0.19;
+
 export function SummaryPanel() {
   const { project, catalog, invalidateProject } = useQuoteBuilder();
   const [tab, setTab] = useState<"items" | "finishes" | "export">("items");
@@ -35,7 +39,23 @@ export function SummaryPanel() {
 
   const updateStatus = api.quotes.updateProjectStatus.useMutation({ onSuccess: invalidateProject });
 
-  const canSend = project.status === "DRAFT" && Number(project.total) > 0;
+  // Totales derivados de los items + acabados que están actualmente en la lista.
+  // Esto evita depender de project.subtotal/total (valores persistidos que pueden
+  // quedar desfasados frente a cambios optimistas como add/delete/update item).
+  const itemsTotal =
+    project.layoutGroups.reduce(
+      (acc, g) => acc + g.items.reduce((s, i) => s + Number(i.totalPrice), 0),
+      0,
+    );
+  const finishesTotal = project.projectFinishes.reduce(
+    (acc, f) => acc + Number(f.totalPrice),
+    0,
+  );
+  const subtotal = itemsTotal + finishesTotal;
+  const tax      = subtotal * TAX_RATE;
+  const total    = subtotal + tax;
+
+  const canSend = project.status === "DRAFT" && total > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -43,10 +63,10 @@ export function SummaryPanel() {
       <div className="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">Resumen</p>
 
-        <TotalRow label="Subtotal"  value={Number(project.subtotal)} muted />
-        <TotalRow label="IVA (0%)"  value={Number(project.tax)}     muted />
+        <TotalRow label="Subtotal"               value={subtotal} muted />
+        <TotalRow label={`IVA (${TAX_RATE * 100}%)`} value={tax}  muted />
         <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
-        <TotalRow label="Total"     value={Number(project.total)}   large />
+        <TotalRow label="Total"                  value={total}    large />
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────────────── */}
@@ -162,7 +182,6 @@ function GroupSummaryRow({
   items: Project["layoutGroups"][number]["items"];
 }) {
   const [open, setOpen] = useState(true);
-  console.log("grupsummaryRow", items)
 
   return (
     <div>
@@ -284,7 +303,6 @@ function DetailRow({
 }: {
   item: { name: string; quantity: number; unitPrice: number; total: number };
 }) {
-  console.log(item,"item detailedROw")
   return (
     <div className="flex justify-between py-0.5 text-xs">
       <div className="flex flex-col">

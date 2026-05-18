@@ -199,15 +199,20 @@ export const quotesRouter = createTRPCRouter({
       // 2. BOM — debe ir antes del pricing (pricing lee los componentes)
       await bomService.instantiateBOM(item.id);
 
-      // 3. Recalculos — paralelos porque no se bloquean entre sí
-      await Promise.all([
-        pricingService.recalculateProject(input.projectId),
-        input.layoutGroupId
-          ? layoutService.recalculateGroupPositions(input.layoutGroupId)
-          : Promise.resolve(),
-      ]);
+      // 3. Recalcular item y proyecto en una sola transacción.
+      //    recalculateQuoteItem persiste unitPrice/totalPrice del nuevo item
+      //    para que recalculateProject lo incluya en el subtotal.
+      await db.$transaction(async (tx) => {
+        await pricingService.recalculateQuoteItem(item.id, tx);
+        await pricingService.recalculateProject(input.projectId, tx);
+      }, { timeout: 30000 });
 
-      // 4. Devolver el item con sus relaciones para que el frontend actualice la UI
+      // 4. Posiciones del grupo (paralelo, no afecta precios)
+      if (input.layoutGroupId) {
+        await layoutService.recalculateGroupPositions(input.layoutGroupId);
+      }
+
+      // 5. Devolver el item con sus relaciones para que el frontend actualice la UI
       return db.quoteItem.findUniqueOrThrow({
         where:   { id: item.id },
         include: { components: true, hardwareItems: true, supplies: true },
@@ -299,6 +304,29 @@ export const quotesRouter = createTRPCRouter({
 
       // Retornar totales actualizados para que el cliente no necesite refetch
       return { project: projectTotals };
+    }),
+
+  // Recalcula precios de todos los items + totales del proyecto.
+  // Útil para reparar proyectos creados antes del fix de addQuoteItem que
+  // dejaban items con totalPrice = 0 en BD.
+  repairProject: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwner(input.projectId, ctx.session.user.id);
+
+      const items = await db.quoteItem.findMany({
+        where: { projectId: input.projectId },
+        select: { id: true },
+      });
+
+      const totals = await db.$transaction(async (tx) => {
+        for (const it of items) {
+          await pricingService.recalculateQuoteItem(it.id, tx);
+        }
+        return pricingService.recalculateProject(input.projectId, tx);
+      }, { timeout: 60000 });
+
+      return { project: totals, itemsRepaired: items.length };
     }),
 
   // Endpoint ultra-rápido para actualizar posición 3D desde el drag del visor

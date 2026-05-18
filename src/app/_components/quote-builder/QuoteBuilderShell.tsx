@@ -15,6 +15,21 @@ type ViewMode = "split" | "floorplan" | "3d";
 export function QuoteBuilderShell() {
   const { project, catalog, isLoadingProject } = useQuoteBuilder();
   const [viewMode, setViewMode] = useState<ViewMode>("split");
+    if (!project || !catalog) return null;
+    const TAX_RATE = 0.19;
+
+    const itemsTotal =
+    project?.layoutGroups.reduce(
+      (acc, g) => acc + g.items.reduce((s, i) => s + Number(i.totalPrice), 0),
+      0,
+    );
+  const finishesTotal = project?.projectFinishes.reduce(
+    (acc, f) => acc + Number(f.totalPrice),
+    0,
+  );
+    const subtotal = itemsTotal + finishesTotal;
+  const tax      = subtotal * TAX_RATE;
+  const total    = subtotal + tax;
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (isLoadingProject || !project || !catalog) {
@@ -83,7 +98,7 @@ export function QuoteBuilderShell() {
           <div className="ml-2 border-l border-gray-200 pl-2 text-sm font-medium dark:border-gray-700">
             <span className="text-gray-400 dark:text-gray-500">Total: </span>
             <span className="text-gray-900 dark:text-gray-100">
-              ${Number(project.total).toLocaleString("es-CO")}
+              ${Number(total).toLocaleString("es-CO",{ minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>

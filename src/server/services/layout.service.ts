@@ -1,5 +1,8 @@
 import { db } from "@/server/db";
-import { type ConnectionType } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+
+// Cliente compatible con $transaction interactivo o con el cliente raíz
+type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
 const CORNER_DELTAS: Record<string, number> = {
   CORNER_90R: -90,
@@ -7,18 +10,31 @@ const CORNER_DELTAS: Record<string, number> = {
   CORNER_45:  -45,
 };
 
-export async function recalculateGroupPositions(groupId: string): Promise<void> {
-  const group = await db.layoutGroup.findUniqueOrThrow({
-    where: { id: groupId },
+const RAD = Math.PI / 180;
+
+export type ItemPosition = {
+  id: string;
+  posX: number;
+  posY: number;
+  posZ: number;
+  rotationY: number;
+};
+
+// ─── Recalcula posiciones y devuelve el array para que el cliente patchee cache ─
+async function recalculateGroupPositions(
+  groupId: string,
+  tx: TxClient = db,
+): Promise<ItemPosition[]> {
+  const group = await tx.layoutGroup.findUniqueOrThrow({
+    where:   { id: groupId },
     include: { items: { orderBy: { groupOrder: "asc" } } },
   });
 
   let curX = group.startX;
   let curZ = group.startY; // Y del plano 2D = Z del espacio 3D
   let angleDeg = group.baseAngle;
-  const RAD = Math.PI / 180;
 
-  const updates = group.items.map((item) => {
+  const updates: ItemPosition[] = group.items.map((item) => {
     const rad = angleDeg * RAD;
 
     // Aplicar gap antes de posicionar este item
@@ -40,14 +56,42 @@ export async function recalculateGroupPositions(groupId: string): Promise<void> 
     return { id: item.id, posX, posY: item.posY, posZ, rotationY };
   });
 
-  await db.$transaction(
-    updates.map((u) =>
-      db.quoteItem.update({
-        where: { id: u.id },
-        data: { posX: u.posX, posY: u.posY, posZ: u.posZ, rotationY: u.rotationY },
-      })
-    )
-  );
+  // Updates secuenciales sobre el mismo tx (Postgres ya está en BEGIN)
+  for (const u of updates) {
+    await tx.quoteItem.update({
+      where: { id: u.id },
+      data:  { posX: u.posX, posY: u.posY, posZ: u.posZ, rotationY: u.rotationY },
+    });
+  }
+
+  return updates;
 }
 
-export const layoutService = { recalculateGroupPositions };
+// ─── Calcula el endpoint (X, Z, ángulo) al que llegaría un nuevo item ─────────
+//     después del último item de la cadena. Usado por createLTurn para saber
+//     dónde colocar el segundo grupo perpendicular.
+async function getGroupEndpoint(
+  groupId: string,
+  tx: TxClient = db,
+): Promise<{ x: number; z: number; angle: number }> {
+  const group = await tx.layoutGroup.findUniqueOrThrow({
+    where:   { id: groupId },
+    include: { items: { orderBy: { groupOrder: "asc" } } },
+  });
+
+  let curX = group.startX;
+  let curZ = group.startY;
+  let angleDeg = group.baseAngle;
+
+  for (const item of group.items) {
+    const rad = angleDeg * RAD;
+    curX += Math.cos(rad) * (item.gapBeforeCm + item.width);
+    curZ += Math.sin(rad) * (item.gapBeforeCm + item.width);
+    const delta = CORNER_DELTAS[item.connectionToNext as string];
+    if (delta !== undefined) angleDeg += delta;
+  }
+
+  return { x: curX, z: curZ, angle: angleDeg };
+}
+
+export const layoutService = { recalculateGroupPositions, getGroupEndpoint };

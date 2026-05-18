@@ -6,6 +6,7 @@ import { type RouterOutputs } from "@/trpc/react";
 import { api } from "@/trpc/react";
 import { useQuoteBuilder } from "./context";
 import { QuoteItemCard } from "./QuoteItemCard";
+import { GroupPositionPanel } from "./GroupPositionPanel";
 import { useId } from "react";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -126,6 +127,7 @@ const id = useId()
 
       {!collapsed && (
         <div className="space-y-1.5 p-2">
+          {isSelected && <GroupPositionPanel group={group} />}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy} id={id}>
               {items.map((item, idx) => (
