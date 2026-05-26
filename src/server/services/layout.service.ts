@@ -8,6 +8,7 @@ const CORNER_DELTAS: Record<string, number> = {
   CORNER_90R: -90,
   CORNER_90L: 90,
   CORNER_45:  -45,
+  INLINE:0,
 };
 
 const RAD = Math.PI / 180;
@@ -86,8 +87,9 @@ async function getGroupEndpoint(
   for (const item of group.items) {
     const rad = angleDeg * RAD;
     curX += Math.cos(rad) * (item.gapBeforeCm + item.width);
-    curZ += Math.sin(rad) * (item.gapBeforeCm + item.width);
+    curZ += Math.sin(rad) * (item.gapBeforeCm + item.width)
     const delta = CORNER_DELTAS[item.connectionToNext as string];
+    console.log("Endpoint",curX,curZ,delta,item)
     if (delta !== undefined) angleDeg += delta;
   }
 

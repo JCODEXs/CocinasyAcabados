@@ -11,6 +11,7 @@ import { Island }        from "./objects/Island";
 import { Appliance }     from "./objects/Appliance";
 import { WallPanel }     from "./objects/WallPanel";
 import { KitchenObject, type KitchenObjectParams, type MaterialConfig } from "./objects/KitchenObject";
+import { DynamicParametricObject } from "./objects/DynamicParametricObject";
 
 type Project    = RouterOutputs["quotes"]["getProject"];
 type QuoteItem  = Project["layoutGroups"][number]["items"][number];
@@ -20,7 +21,7 @@ type LayoutGroup = Project["layoutGroups"][number];
 
 type ElementCategory =
   | "MUEBLE_BAJO" | "MUEBLE_ALTO" | "MESON" | "ELECTRODOMESTICO"
-  | "PANEL_YESO"  | "SUPERBOARD"  | "PUERTA" | "ESTANTE" | "OTRO";
+  | "PANEL_YESO"  | "SUPERBOARD"  | "PUERTA" | "ESTANTE" | "OTRO"|"DINAMICO";
 
 type SceneMode = "REALISTIC" | "WIREFRAME" | "BLUEPRINT";
 
@@ -44,6 +45,7 @@ const STATIC_Y_OFFSET: Record<ElementCategory, number> = {
   PUERTA:           0,
   ESTANTE:          1.40,
   OTRO:             0,
+  DINAMICO:         0,
 };
 
 const STATIC_Z_OFFSET: Record<ElementCategory, number> = {
@@ -56,6 +58,8 @@ const STATIC_Z_OFFSET: Record<ElementCategory, number> = {
   PUERTA:           0,
   ESTANTE:          0.125,
   OTRO:             0,
+  DINAMICO:         0,
+
 };
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
@@ -88,6 +92,8 @@ KitchenObjectFactory.register("SUPERBOARD",       WallPanel    as unknown as Kit
 KitchenObjectFactory.register("PUERTA",           WallPanel    as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("ESTANTE",          UpperCabinet as unknown as KitchenObjectCtor);
 KitchenObjectFactory.register("OTRO",             LowerCabinet as unknown as KitchenObjectCtor);
+KitchenObjectFactory.register("DINAMICO",         DynamicParametricObject as unknown as KitchenObjectCtor);
+
 
 // ─── Estado por item ──────────────────────────────────────────────────────────
 
@@ -255,15 +261,17 @@ export class KitchenScene {
     for (const item of group.items) {
       const cat  = item.elementType.category as ElementCategory;
       const yOff = this.getItemYOffset(cat);
-      const zOff = STATIC_Z_OFFSET[cat] ?? 0;
-      const rotY = (item.rotationY * Math.PI) / 180;
+      const zOff = STATIC_Z_OFFSET[cat];
+      const rotY = (-(item.rotationY * Math.PI))/ 180;
+
+      console.log(cat,"Category")
 
       // Instancia principal (index 0)
       results.push({
         item,
-        posX: item.posX / 100,
-        posY: yOff,
-        posZ: item.posZ / 100 + zOff,
+        posX: item.posX / 100 +Math.sin(rotY)*item.width/200-Math.sin(rotY)*item.depth/200 -(item.rotationY===-90?item.depth/200:0)-(item.rotationY===-180?item.width/100:0)-(item.rotationY===180?(item.width/100)+0.15:0),
+        posY: yOff ,
+        posZ: item.posZ / 100-Math.sin(rotY)*item.depth/200-Math.sin(rotY)*item.width/200+(item.rotationY===180?(item.depth/100):0)-(item.rotationY===-180?item.depth/100:0),
         rotY,
         instanceIndex: 0,
       });
@@ -275,6 +283,8 @@ export class KitchenScene {
         const extraX   = item.posX / 100 + Math.cos(rotY) * widthM * i;
         const extraZ   = item.posZ / 100 + Math.sin(rotY) * widthM * i;
 
+       
+
         results.push({
           item,
           posX: extraX,
@@ -285,7 +295,7 @@ export class KitchenScene {
         });
       }
     }
-
+ console.log(results,"extraZ",group.items)
     return results;
   }
 

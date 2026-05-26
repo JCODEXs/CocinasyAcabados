@@ -26,7 +26,7 @@ export class Appliance extends KitchenObject {
 
     this.type = params.applianceType ?? "GENERICO";
 
-    // this.initialize();
+    this.initialize();
   }
 
   protected build(): void {

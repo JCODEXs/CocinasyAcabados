@@ -21,7 +21,7 @@ const ConnectionTypeSchema = z.enum([
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const createProjectSchema = z.object({
-  clientId:   z.string().cuid(),
+  clientId:   z.string(),
   name:       z.string().min(1).max(120),
   roomWidth:  z.number().positive().optional(),
   roomLength: z.number().positive().optional(),
@@ -30,19 +30,19 @@ const createProjectSchema = z.object({
 });
 
 const addQuoteItemSchema = z.object({
-  projectId:     z.string().cuid(),
+  projectId:     z.string(),
   elementTypeId: z.string(),
   label:         z.string().optional(),
   width:         z.number().positive(),
   height:        z.number().positive(),
   depth:         z.number().positive(),
   quantity:      z.number().int().positive().default(1),
-  layoutGroupId: z.string().cuid().optional(),
+  layoutGroupId: z.string().optional(),
   groupOrder:    z.number().int().default(0),
 });
 
 const updateQuoteItemSchema = z.object({
-  id:              z.string().cuid(),
+  id:              z.string(),
   label:           z.string().optional(),
   width:           z.number().positive().optional(),
   height:          z.number().positive().optional(),
@@ -54,19 +54,19 @@ const updateQuoteItemSchema = z.object({
 });
 
 const updateComponentSchema = z.object({
-  componentId:    z.string().cuid(),
-  materialId:     z.string().cuid().nullable().optional(),
-  surfaceFinishId:z.string().cuid().nullable().optional(),
+  componentId:    z.string(),
+  materialId:     z.string().nullable().optional(),
+  surfaceFinishId:z.string().nullable().optional(),
 });
 
 const updateEdgeSchema = z.object({
-  edgeId:          z.string().cuid(),
-  edgeTreatmentId: z.string().cuid(),
+  edgeId:          z.string(),
+  edgeTreatmentId: z.string(),
 });
 
 const upsertHardwareItemSchema = z.object({
-  quoteItemId: z.string().cuid(),
-  hardwareId:  z.string().cuid(),
+  quoteItemId: z.string(),
+  hardwareId:  z.string(),
   quantity:    z.number().int().positive(),
 });
 
@@ -101,7 +101,7 @@ export const quotesRouter = createTRPCRouter({
   // Project base + layoutGroups se traen en dos queries paralelas,
   // lo que reduce el tiempo de respuesta de ~1500ms a ~400ms en proyectos grandes.
   getProject: protectedProcedure
-    .input(z.object({ id: z.string().cuid() }))
+    .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const [project, layoutGroups] = await Promise.all([
         db.project.findUnique({
@@ -153,7 +153,7 @@ export const quotesRouter = createTRPCRouter({
     }),
 
   updateProject: protectedProcedure
-    .input(createProjectSchema.partial().extend({ id: z.string().cuid() }))
+    .input(createProjectSchema.partial().extend({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
       // El where compuesto elimina la query de assertProjectOwner
@@ -164,7 +164,7 @@ export const quotesRouter = createTRPCRouter({
     }),
 
   updateProjectStatus: protectedProcedure
-    .input(z.object({ id: z.string().cuid(), status: ProjectStatusSchema }))
+    .input(z.object({ id: z.string(), status: ProjectStatusSchema }))
     .mutation(({ ctx, input }) =>
       db.project.update({
         where: { id: input.id, userId: ctx.session.user.id },
@@ -173,7 +173,7 @@ export const quotesRouter = createTRPCRouter({
     ),
 
   deleteProject: protectedProcedure
-    .input(z.object({ id: z.string().cuid() }))
+    .input(z.object({ id: z.string() }))
     .mutation(({ ctx, input }) =>
       db.project.delete({
         where: { id: input.id, userId: ctx.session.user.id },
@@ -281,7 +281,7 @@ export const quotesRouter = createTRPCRouter({
     }),
 
   deleteQuoteItem: protectedProcedure
-    .input(z.object({ id: z.string().cuid() }))
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const item = await db.quoteItem.findUnique({
         where:  { id: input.id },
@@ -310,7 +310,7 @@ export const quotesRouter = createTRPCRouter({
   // Útil para reparar proyectos creados antes del fix de addQuoteItem que
   // dejaban items con totalPrice = 0 en BD.
   repairProject: protectedProcedure
-    .input(z.object({ projectId: z.string().cuid() }))
+    .input(z.object({ projectId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertProjectOwner(input.projectId, ctx.session.user.id);
 
@@ -332,7 +332,7 @@ export const quotesRouter = createTRPCRouter({
   // Endpoint ultra-rápido para actualizar posición 3D desde el drag del visor
   updateItemPosition: protectedProcedure
     .input(z.object({
-      id:        z.string().cuid(),
+      id:        z.string(),
       posX:      z.number(),
       posY:      z.number().optional(),
       posZ:      z.number(),
@@ -536,7 +536,7 @@ export const quotesRouter = createTRPCRouter({
     }),
 
   removeHardwareItem: protectedProcedure
-    .input(z.object({ id: z.string().cuid() }))
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const hw = await db.hardwareItem.findUnique({
         where:  { id: input.id },
@@ -558,7 +558,7 @@ export const quotesRouter = createTRPCRouter({
 
   upsertProjectFinish: protectedProcedure
     .input(z.object({
-      projectId: z.string().cuid(),
+      projectId: z.string(),
       finishId:  z.string(),
       areaM2:    z.number().positive(),
       notes:     z.string().optional(),
@@ -600,7 +600,7 @@ export const quotesRouter = createTRPCRouter({
   // ── BOM manual ────────────────────────────────────────────────────────────────
 
   reinstantiateBOM: protectedProcedure
-    .input(z.object({ quoteItemId: z.string().cuid() }))
+    .input(z.object({ quoteItemId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const item = await db.quoteItem.findUnique({
         where:  { id: input.quoteItemId },

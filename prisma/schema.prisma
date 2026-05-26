@@ -12,8 +12,8 @@ datasource db {
   // DIRECT_URL   → Conexión directa al puerto 5432 de Supabase (sin pooler).
   //   Necesaria para: prisma migrate, prisma introspect y triggers DDL.
   // https://www.prisma.io/docs/guides/performance-and-optimization/connection-management/configure-pg-bouncer
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  //url       = env("DATABASE_URL")
+url = env("DIRECT_URL")
 }
 
 // Necessary for Next auth
@@ -152,6 +152,7 @@ enum ElementCategory {
   PUERTA
   ESTANTE
   OTRO
+  DINAMICO
 }
 
 enum PricingUnit {
@@ -400,6 +401,9 @@ model ComponentTemplate {
   heightFormula String // "H - 3.6"
   thicknessMM   Int    @default(18)
   depthFormula  String @default("D")
+  posXFormula  String  @default("0")
+  posYFormula  String  @default("H / 2")
+  posZFormula  String  @default("0")
 
   quantity  Int @default(1)
   sortOrder Int @default(0)

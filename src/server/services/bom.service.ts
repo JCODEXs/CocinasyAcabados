@@ -68,12 +68,20 @@ function evalFormula(
   W: number,
   H: number,
   D: number,
+  ZO:number,
+  T:number,
+  IW:number,
+  ID:number,
 ): number {
   // Reemplazar variables — \b asegura que no toca "WIDTH", "DEPTH", etc.
   const expr = formula
     .trim()
     .replace(/\bW\b/g, String(W))
     .replace(/\bH\b/g, String(H))
+    .replace(/\bZO\b/g, String(ZO))
+    .replace(/\bT\b/g, String(T))
+    .replace(/\bIW\b/g, String(IW))
+    .replace(/\bID\b/g, String(ID))
     .replace(/\bD\b/g, String(D));
 
   // Validar que solo contenga caracteres seguros antes de evaluar
@@ -143,6 +151,11 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   }
 
   const { width: W, height: H, depth: D } = item;
+  // introducir T y ZO a las variables del item 
+  const ZO=7;
+  const T=1.8
+  const IW=W-2*T
+  const ID = D-2*T
   const templates = item.elementType.componentTemplates;
 
   // Fetch paralelo de recursos del catálogo
@@ -197,12 +210,34 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   let totalBoardArea = 0;
 
   for (const tmpl of templates) {
-    const compW = evalFormula(tmpl.widthFormula,      W, H, D);
-    const compH = evalFormula(tmpl.heightFormula,     W, H, D);
+    const compW = evalFormula(tmpl.widthFormula,      W, H, D,ZO,T,IW,ID);
+    const compH = evalFormula(tmpl.heightFormula,     W, H, D,ZO,T,IW,ID);
     // depthFormula tiene @default("D") en el schema — siempre existe
-    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D);
+    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D,ZO,T,IW,ID);
+    let faceWidth: number, faceHeight: number, thicknessCm: number;
+switch (tmpl.componentType) {
+  case "LATERAL":
+    case "DIVISION":
+    thicknessCm = compW;
+    faceWidth = compD;
+    faceHeight = compH;
+    break;
+  case "TECHO":
+  case "PISO":
+  case "ENTREPAÑO":
+    thicknessCm = compH;
+    faceWidth = compW;
+    faceHeight = compD;
+    break;
+  default: // FONDO, PUERTA, ZOCALO, etc.
+    thicknessCm = compD;
+    faceWidth = compW;
+    faceHeight = compH;
+    break;
+}
+const areaM2 = (faceWidth * faceHeight * tmpl.quantity) / 10000;
 
-    const areaM2 = (compW * compH * tmpl.quantity) / 10_000;
+    // const areaM2 = (compW * compH * tmpl.quantity) / 10_000;
     totalBoardArea += areaM2;
 
     const mat = pickMaterial(tmpl.defaultMaterialCategory as MaterialCategory | null);
@@ -220,8 +255,8 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
       quoteItemId,
       componentType:   tmpl.componentType as ComponentType,
       label:           tmpl.label ?? null,
-      widthCm:         compW,
-      heightCm:        compH,
+      widthCm:         faceWidth,
+      heightCm:        faceHeight,
       thicknessMM:     tmpl.thicknessMM,
       quantity:        tmpl.quantity,
       materialId:      mat?.id ?? null,

@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
 import type { ElementCategory, MaterialCategory, HardwareCategory, QualityTier, SurfaceFinishType, EdgeType, SupplyCategory, ComponentType } from "@prisma/client";
-
+import { ComponentTemplatesEditor } from "@/app/_components/quote-builder/ComponentTemplatateEditor";
 
 
 // interface Material {
@@ -120,7 +120,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   MUEBLE_BAJO: "Muebles bajos", MUEBLE_ALTO: "Muebles altos",
   MESON: "Mesones", ELECTRODOMESTICO: "Electrodomésticos",
   PANEL_YESO: "Panel yeso", SUPERBOARD: "Superboard",
-  PUERTA: "Puertas", ESTANTE: "Estantes", OTRO: "Otros",
+  PUERTA: "Puertas", ESTANTE: "Estantes", OTRO: "Otros",DINAMICO:"Dinamico"
 };
 
 const UNIT_LABELS: Record<string, string> = {
@@ -211,7 +211,7 @@ export default function CatalogPage() {
 }
 
  
-// ─── Tab: Tipos de elemento ───────────────────────────────────────────────────
+// // ─── Tab: Tipos de elemento ───────────────────────────────────────────────────
 
 function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => void }) {
   const [showForm, setShowForm]   = useState(false);
@@ -245,7 +245,7 @@ const CHECKBOX_FIELDS = [
 type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
   const THREE_JS_MODELS = [
     "LowerCabinet", "UpperCabinet", "UpperCabinetGlass",
-    "Island", "Appliance", "WallPanel", "CountertopSection",
+    "Island", "Appliance", "WallPanel", "CountertopSection","DINAMICO"
   ];
 
   return (
@@ -273,7 +273,7 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
                 {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </Field>
-            <Field label="Unidad de precio">
+            {/* <Field label="Unidad de precio">
               <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className="input">
                 {Object.entries(UNIT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
@@ -281,7 +281,7 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
             <Field label="Precio base (COP)">
               <input type="number" value={form.basePrice}
                 onChange={e => setForm(f => ({ ...f, basePrice: +e.target.value }))} className="input" />
-            </Field>
+            </Field> */}
             <Field label="Modelo 3D">
               <select value={form.threeJsModel} onChange={e => setForm(f => ({ ...f, threeJsModel: e.target.value }))} className="input">
                 {THREE_JS_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -381,12 +381,12 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
     </div>
   );
 }
-// ─── Editor de paneles (ComponentTemplates) ───────────────────────────────────
+// // ─── Editor de paneles (ComponentTemplates) ───────────────────────────────────
 
-// const COMPONENT_TYPES = [
-//   "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
-//   "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
-// ] as const;
+// // const COMPONENT_TYPES = [
+// //   "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
+// //   "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
+// // ] as const;
 
 const COMPONENT_TYPE_LABELS: Record<string, string> = {
   LATERAL: "Lateral", FONDO: "Fondo", TECHO: "Techo", PISO: "Piso",
@@ -395,324 +395,322 @@ const COMPONENT_TYPE_LABELS: Record<string, string> = {
   DIVISION: "División", RIEL: "Riel",
 };
 
-const MATERIAL_CATEGORIES_SHORT: Record<string, string> = {
-  MADERA_NATURAL: "Madera", MDF_LACADO: "MDF lacado", MELAMINA: "Melamina",
-  GRANITO: "Granito", MARMOL: "Mármol", CUARZO: "Cuarzo",
-  CERAMICA: "Cerámica", PANEL_YESO: "Panel yeso", SUPERBOARD: "Superboard", OTRO: "Otro",
-};
+// const MATERIAL_CATEGORIES_SHORT: Record<string, string> = {
+//   MADERA_NATURAL: "Madera", MDF_LACADO: "MDF lacado", MELAMINA: "Melamina",
+//   GRANITO: "Granito", MARMOL: "Mármol", CUARZO: "Cuarzo",
+//   CERAMICA: "Cerámica", PANEL_YESO: "Panel yeso", SUPERBOARD: "Superboard", OTRO: "Otro",
+// };
 
-const SURFACE_FINISH_TYPES: Record<string, string> = {
-  LACADO: "Lacado", CHAPA_MADERA: "Chapa madera", MELAMINA: "Melamina",
-  VINILO_ADHESIVO: "Vinilo", PINTURA: "Pintura", BARNIZ: "Barniz", SIN_ACABADO: "Sin acabado",
-};
+// const SURFACE_FINISH_TYPES: Record<string, string> = {
+//   LACADO: "Lacado", CHAPA_MADERA: "Chapa madera", MELAMINA: "Melamina",
+//   VINILO_ADHESIVO: "Vinilo", PINTURA: "Pintura", BARNIZ: "Barniz", SIN_ACABADO: "Sin acabado",
+// };
 
+// const emptyTemplate = (): ComponentTemplate => ({
+//   componentType: "LATERAL",
+//   label: "",
+//   widthFormula: "D",
+//   heightFormula: "H",
+//   depthFormula: "D",
+//   thicknessMM: 18,
+//   quantity: 1,
+//   sortOrder: 0,
+//   topEdge: false,
+//   bottomEdge: false,
+//   leftEdge: false,
+//   rightEdge: false,
+//   defaultMaterialCategory: "MADERA_NATURAL",
+//   defaultSurfaceFinishType: "SIN_ACABADO",
+// });
 
+// function ComponentTemplatesEditor({
+//   elementTypeId,
+//   templates,
+//   onSaved,
+// }: {
+//   elementTypeId: string;
+//   templates: any[];
+//   onSaved: () => void;
+// }) {
+// const [rows, setRows] = useState<ComponentTemplate[]>(() => 
+//   templates.length > 0 
+//     ? templates.map((t: any) => ({
+//         id: t.id,
+//         componentType: t.componentType as ComponentType, // ✅ Type assertion
+//         label: t.label ?? "",
+//         widthFormula: t.widthFormula,
+//         heightFormula: t.heightFormula,
+//         depthFormula: t.depthFormula ?? "D",
+//         thicknessMM: t.thicknessMM,
+//         quantity: t.quantity,
+//         sortOrder: t.sortOrder,
+//         topEdge: t.topEdge,
+//         bottomEdge: t.bottomEdge,
+//         leftEdge: t.leftEdge,
+//         rightEdge: t.rightEdge,
+//         defaultMaterialCategory: t.defaultMaterialCategory as MaterialCategory ?? "MADERA_NATURAL",
+//         defaultSurfaceFinishType: t.defaultSurfaceFinishType as SurfaceFinishType ?? "SIN_ACABADO",
+//       }))
+//     : []
+// );
 
-const emptyTemplate = (): ComponentTemplate => ({
-  componentType: "LATERAL",
-  label: "",
-  widthFormula: "D",
-  heightFormula: "H",
-  depthFormula: "D",
-  thicknessMM: 18,
-  quantity: 1,
-  sortOrder: 0,
-  topEdge: false,
-  bottomEdge: false,
-  leftEdge: false,
-  rightEdge: false,
-  defaultMaterialCategory: "MADERA_NATURAL",
-  defaultSurfaceFinishType: "SIN_ACABADO",
-});
+//   const [dirty, setDirty] = useState(false);
 
-function ComponentTemplatesEditor({
-  elementTypeId,
-  templates,
-  onSaved,
-}: {
-  elementTypeId: string;
-  templates: any[];
-  onSaved: () => void;
-}) {
-const [rows, setRows] = useState<ComponentTemplate[]>(() => 
-  templates.length > 0 
-    ? templates.map((t: any) => ({
-        id: t.id,
-        componentType: t.componentType as ComponentType, // ✅ Type assertion
-        label: t.label ?? "",
-        widthFormula: t.widthFormula,
-        heightFormula: t.heightFormula,
-        depthFormula: t.depthFormula ?? "D",
-        thicknessMM: t.thicknessMM,
-        quantity: t.quantity,
-        sortOrder: t.sortOrder,
-        topEdge: t.topEdge,
-        bottomEdge: t.bottomEdge,
-        leftEdge: t.leftEdge,
-        rightEdge: t.rightEdge,
-        defaultMaterialCategory: t.defaultMaterialCategory as MaterialCategory ?? "MADERA_NATURAL",
-        defaultSurfaceFinishType: t.defaultSurfaceFinishType as SurfaceFinishType ?? "SIN_ACABADO",
-      }))
-    : []
-);
+//   const save = api.catalog.setComponentTemplates.useMutation({
+//     onSuccess: () => { setDirty(false); onSaved(); },
+//   });
 
-  const [dirty, setDirty] = useState(false);
+//   const updateRow = (idx: number, patch: Partial<ComponentTemplate>) => {
+//     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+//     setDirty(true);
+//   };
 
-  const save = api.catalog.setComponentTemplates.useMutation({
-    onSuccess: () => { setDirty(false); onSaved(); },
-  });
+//   const addRow = () => {
+//     setRows(prev => [...prev, { ...emptyTemplate(), sortOrder: prev.length }]);
+//     setDirty(true);
+//   };
 
-  const updateRow = (idx: number, patch: Partial<ComponentTemplate>) => {
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
-    setDirty(true);
-  };
+//   const removeRow = (idx: number) => {
+//     setRows(prev => prev.filter((_, i) => i !== idx));
+//     setDirty(true);
+//   };
 
-  const addRow = () => {
-    setRows(prev => [...prev, { ...emptyTemplate(), sortOrder: prev.length }]);
-    setDirty(true);
-  };
+//   const moveRow = (idx: number, dir: -1 | 1) => {
+//     const next = idx + dir;
+//     if (next < 0 || next >= rows.length) return;
+//     const copy = [...rows];
+//     [copy[idx], copy[next]] = [copy[next]!, copy[idx]!];
+//     setRows(copy.map((r, i) => ({ ...r, sortOrder: i })));
+//     setDirty(true);
+//   };
 
-  const removeRow = (idx: number) => {
-    setRows(prev => prev.filter((_, i) => i !== idx));
-    setDirty(true);
-  };
+//  const handleSave = () => {
+//   save.mutate({
+//     elementTypeId,
+//     templates: rows.map((r, i): ComponentTemplate => ({
+//       ...r,
+//       sortOrder: i,
+//       // Usar ! para asegurar que no es null/undefined, o mantener undefined
+//       defaultMaterialCategory: r.defaultMaterialCategory??undefined,
+//       defaultSurfaceFinishType: r.defaultSurfaceFinishType ??undefined,
+//     })),
+//   });
+// };
 
-  const moveRow = (idx: number, dir: -1 | 1) => {
-    const next = idx + dir;
-    if (next < 0 || next >= rows.length) return;
-    const copy = [...rows];
-    [copy[idx], copy[next]] = [copy[next]!, copy[idx]!];
-    setRows(copy.map((r, i) => ({ ...r, sortOrder: i })));
-    setDirty(true);
-  };
+//   return (
+//     <div>
+//       {/* Header */}
+//       <div className="mb-3 flex items-center justify-between">
+//         <div>
+//           <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Paneles del mueble (BOM)</p>
+//           <p className="text-xs text-gray-400 mt-0.5">
+//             Fórmulas: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">W</code> = ancho,{" "}
+//             <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">H</code> = alto,{" "}
+//             <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">D</code> = fondo (en cm). Ej: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">W / 2</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">H - 3.6</code>
+//           </p>
+//         </div>
+//         <div className="flex gap-2">
+//           <button
+//             onClick={addRow}
+//             className="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-white dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+//           >
+//             <PlusIcon className="h-3.5 w-3.5" /> Agregar panel
+//           </button>
+//           {dirty && (
+//             <button
+//               onClick={handleSave}
+//               disabled={save.isPending}
+//               className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900"
+//             >
+//               {save.isPending ? "Guardando..." : "Guardar paneles"}
+//             </button>
+//           )}
+//         </div>
+//       </div>
 
- const handleSave = () => {
-  save.mutate({
-    elementTypeId,
-    templates: rows.map((r, i): ComponentTemplate => ({
-      ...r,
-      sortOrder: i,
-      // Usar ! para asegurar que no es null/undefined, o mantener undefined
-      defaultMaterialCategory: r.defaultMaterialCategory??undefined,
-      defaultSurfaceFinishType: r.defaultSurfaceFinishType ??undefined,
-    })),
-  });
-};
+//       {rows.length === 0 && (
+//         <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center dark:border-gray-700">
+//           <p className="text-sm text-gray-400">Sin paneles definidos</p>
+//           <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">
+//             El BOM se instanciará vacío al agregar este elemento a una cotización
+//           </p>
+//         </div>
+//       )}
 
-  return (
-    <div>
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Paneles del mueble (BOM)</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Fórmulas: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">W</code> = ancho,{" "}
-            <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">H</code> = alto,{" "}
-            <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">D</code> = fondo (en cm). Ej: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">W / 2</code>, <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">H - 3.6</code>
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={addRow}
-            className="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-white dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <PlusIcon className="h-3.5 w-3.5" /> Agregar panel
-          </button>
-          {dirty && (
-            <button
-              onClick={handleSave}
-              disabled={save.isPending}
-              className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900"
-            >
-              {save.isPending ? "Guardando..." : "Guardar paneles"}
-            </button>
-          )}
-        </div>
-      </div>
+//       {rows.length > 0 && (
+//         <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+//           <table className="w-full text-xs">
+//             <thead>
+//               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+//                 {[
+//                   "Orden", "Tipo", "Etiqueta", "Ancho (fórmula)", "Alto (fórmula)",
+//                   "Fondo (fórmula)", "Esp. (mm)", "Cant.", "Cantos visibles",
+//                   "Material default", "Acabado default", "",
+//                 ].map(h => (
+//                   <th key={h} className="px-2 py-2 text-left font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+//                     {h}
+//                   </th>
+//                 ))}
+//               </tr>
+//             </thead>
+//             <tbody>
+//               {rows.map((row, idx) => (
+//                 <tr key={idx} className="border-b border-gray-100 last:border-0 dark:border-gray-800 hover:bg-white dark:hover:bg-gray-800/20">
+//                   {/* Orden */}
+//                   <td className="px-2 py-1.5">
+//                     <div className="flex flex-col gap-0.5">
+//                       <button onClick={() => moveRow(idx, -1)} disabled={idx === 0}
+//                         className="text-gray-300 hover:text-gray-600 disabled:opacity-20 dark:text-gray-600">▲</button>
+//                       <button onClick={() => moveRow(idx, 1)} disabled={idx === rows.length - 1}
+//                         className="text-gray-300 hover:text-gray-600 disabled:opacity-20 dark:text-gray-600">▼</button>
+//                     </div>
+//                   </td>
 
-      {rows.length === 0 && (
-        <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center dark:border-gray-700">
-          <p className="text-sm text-gray-400">Sin paneles definidos</p>
-          <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">
-            El BOM se instanciará vacío al agregar este elemento a una cotización
-          </p>
-        </div>
-      )}
+//                   {/* Tipo */}
+//                   <td className="px-2 py-1.5">
+//                     <select
+//                       value={row.componentType}
+//                       onChange={e => updateRow(idx, { componentType: e.target.value as ComponentType })}
+//                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+//                     >
+//                       {COMPONENT_TYPES.map(t => (
+//                         <option key={t} value={t}>{COMPONENT_TYPE_LABELS[t]}</option>
+//                       ))}
+//                     </select>
+//                   </td>
 
-      {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-                {[
-                  "Orden", "Tipo", "Etiqueta", "Ancho (fórmula)", "Alto (fórmula)",
-                  "Fondo (fórmula)", "Esp. (mm)", "Cant.", "Cantos visibles",
-                  "Material default", "Acabado default", "",
-                ].map(h => (
-                  <th key={h} className="px-2 py-2 text-left font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => (
-                <tr key={idx} className="border-b border-gray-100 last:border-0 dark:border-gray-800 hover:bg-white dark:hover:bg-gray-800/20">
-                  {/* Orden */}
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-col gap-0.5">
-                      <button onClick={() => moveRow(idx, -1)} disabled={idx === 0}
-                        className="text-gray-300 hover:text-gray-600 disabled:opacity-20 dark:text-gray-600">▲</button>
-                      <button onClick={() => moveRow(idx, 1)} disabled={idx === rows.length - 1}
-                        className="text-gray-300 hover:text-gray-600 disabled:opacity-20 dark:text-gray-600">▼</button>
-                    </div>
-                  </td>
+//                   {/* Etiqueta */}
+//                   <td className="px-2 py-1.5">
+//                     <input
+//                       value={row.label}
+//                       onChange={e => updateRow(idx, { label: e.target.value })}
+//                       placeholder="Ej: Lateral izq."
+//                       className="w-28 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+//                     />
+//                   </td>
 
-                  {/* Tipo */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={row.componentType}
-                      onChange={e => updateRow(idx, { componentType: e.target.value as ComponentType })}
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      {COMPONENT_TYPES.map(t => (
-                        <option key={t} value={t}>{COMPONENT_TYPE_LABELS[t]}</option>
-                      ))}
-                    </select>
-                  </td>
+//                   {/* Fórmulas */}
+//                   {(["widthFormula", "heightFormula", "depthFormula"] as const).map(field => (
+//                     <td key={field} className="px-2 py-1.5">
+//                       <input
+//                         value={row[field]}
+//                         onChange={e => updateRow(idx, { [field]: e.target.value })}
+//                         placeholder="W"
+//                         className="w-20 rounded border border-gray-200 bg-white px-1.5 py-1 font-mono text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+//                       />
+//                     </td>
+//                   ))}
 
-                  {/* Etiqueta */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      value={row.label}
-                      onChange={e => updateRow(idx, { label: e.target.value })}
-                      placeholder="Ej: Lateral izq."
-                      className="w-28 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                    />
-                  </td>
+//                   {/* Espesor */}
+//                   <td className="px-2 py-1.5">
+//                     <input
+//                       type="number"
+//                       value={row.thicknessMM}
+//                       onChange={e => updateRow(idx, { thicknessMM: +e.target.value })}
+//                       className="w-14 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+//                     />
+//                   </td>
 
-                  {/* Fórmulas */}
-                  {(["widthFormula", "heightFormula", "depthFormula"] as const).map(field => (
-                    <td key={field} className="px-2 py-1.5">
-                      <input
-                        value={row[field]}
-                        onChange={e => updateRow(idx, { [field]: e.target.value })}
-                        placeholder="W"
-                        className="w-20 rounded border border-gray-200 bg-white px-1.5 py-1 font-mono text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                      />
-                    </td>
-                  ))}
+//                   {/* Cantidad */}
+//                   <td className="px-2 py-1.5">
+//                     <input
+//                       type="number"
+//                       min={1}
+//                       value={row.quantity}
+//                       onChange={e => updateRow(idx, { quantity: +e.target.value })}
+//                       className="w-12 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+//                     />
+//                   </td>
 
-                  {/* Espesor */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="number"
-                      value={row.thicknessMM}
-                      onChange={e => updateRow(idx, { thicknessMM: +e.target.value })}
-                      className="w-14 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                    />
-                  </td>
+//                   {/* Cantos visibles */}
+//                   <td className="px-2 py-1.5">
+//                     <div className="flex flex-col gap-1">
+//                       <div className="flex gap-2">
+//                         {(["topEdge", "bottomEdge", "leftEdge", "rightEdge"] as const).map(edge => (
+//                           <label key={edge} className="flex items-center gap-1 cursor-pointer" title={
+//                             edge === "topEdge" ? "Superior" : edge === "bottomEdge" ? "Inferior" :
+//                             edge === "leftEdge" ? "Izquierdo" : "Derecho"
+//                           }>
+//                             <input
+//                               type="checkbox"
+//                               checked={row[edge]}
+//                               onChange={e => updateRow(idx, { [edge]: e.target.checked })}
+//                               className="h-3 w-3"
+//                             />
+//                             <span className="text-gray-500 dark:text-gray-400">
+//                               {edge === "topEdge" ? "↑" : edge === "bottomEdge" ? "↓" :
+//                                edge === "leftEdge" ? "←" : "→"}
+//                             </span>
+//                           </label>
+//                         ))}
+//                       </div>
+//                     </div>
+//                   </td>
 
-                  {/* Cantidad */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      value={row.quantity}
-                      onChange={e => updateRow(idx, { quantity: +e.target.value })}
-                      className="w-12 rounded border border-gray-200 bg-white px-1.5 py-1 text-xs focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                    />
-                  </td>
+//                   {/* Material default */}
+//                   <td className="px-2 py-1.5">
+//                     <select
+//                       value={row.defaultMaterialCategory}
+//                       onChange={e => updateRow(idx, { defaultMaterialCategory: e.target.value as MaterialCategory })}
+//                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+//                     >
+//                       <option value="">— Cualquiera —</option>
+//                       {Object.entries(MATERIAL_CATEGORIES_SHORT).map(([v, l]) => (
+//                         <option key={v} value={v}>{l}</option>
+//                       ))}
+//                     </select>
+//                   </td>
 
-                  {/* Cantos visibles */}
-                  <td className="px-2 py-1.5">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex gap-2">
-                        {(["topEdge", "bottomEdge", "leftEdge", "rightEdge"] as const).map(edge => (
-                          <label key={edge} className="flex items-center gap-1 cursor-pointer" title={
-                            edge === "topEdge" ? "Superior" : edge === "bottomEdge" ? "Inferior" :
-                            edge === "leftEdge" ? "Izquierdo" : "Derecho"
-                          }>
-                            <input
-                              type="checkbox"
-                              checked={row[edge]}
-                              onChange={e => updateRow(idx, { [edge]: e.target.checked })}
-                              className="h-3 w-3"
-                            />
-                            <span className="text-gray-500 dark:text-gray-400">
-                              {edge === "topEdge" ? "↑" : edge === "bottomEdge" ? "↓" :
-                               edge === "leftEdge" ? "←" : "→"}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </td>
+//                   {/* Acabado default */}
+//                   <td className="px-2 py-1.5">
+//                     <select
+//                       value={row.defaultSurfaceFinishType}
+//                       onChange={e => updateRow(idx, { defaultSurfaceFinishType: e.target.value as SurfaceFinishType})}
+//                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+//                     >
+//                       <option value="">— Ninguno —</option>
+//                       {Object.entries(SURFACE_FINISH_TYPES).map(([v, l]) => (
+//                         <option key={v} value={v}>{l}</option>
+//                       ))}
+//                     </select>
+//                   </td>
 
-                  {/* Material default */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={row.defaultMaterialCategory}
-                      onChange={e => updateRow(idx, { defaultMaterialCategory: e.target.value as MaterialCategory })}
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      <option value="">— Cualquiera —</option>
-                      {Object.entries(MATERIAL_CATEGORIES_SHORT).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                  </td>
+//                   {/* Eliminar */}
+//                   <td className="px-2 py-1.5">
+//                     <button
+//                       onClick={() => removeRow(idx)}
+//                       className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 dark:text-gray-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+//                     >
+//                       <TrashIcon className="h-3.5 w-3.5" />
+//                     </button>
+//                   </td>
+//                 </tr>
+//               ))}
+//             </tbody>
+//           </table>
+//         </div>
+//       )}
 
-                  {/* Acabado default */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={row.defaultSurfaceFinishType}
-                      onChange={e => updateRow(idx, { defaultSurfaceFinishType: e.target.value as SurfaceFinishType})}
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-xs text-gray-700 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                    >
-                      <option value="">— Ninguno —</option>
-                      {Object.entries(SURFACE_FINISH_TYPES).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                  </td>
+//       {/* Preview de lo que produce la fórmula con dimensiones de ejemplo */}
+//       {rows.length > 0 && (
+//         <FormulaPreview rows={rows} />
+//       )}
 
-                  {/* Eliminar */}
-                  <td className="px-2 py-1.5">
-                    <button
-                      onClick={() => removeRow(idx)}
-                      className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 dark:text-gray-600 dark:hover:bg-red-950 dark:hover:text-red-400"
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Preview de lo que produce la fórmula con dimensiones de ejemplo */}
-      {rows.length > 0 && (
-        <FormulaPreview rows={rows} />
-      )}
-
-      {/* Botón de guardar abajo también para tablas largas */}
-      {dirty && rows.length > 4 && (
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={save.isPending}
-            className="rounded-md bg-gray-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900"
-          >
-            {save.isPending ? "Guardando..." : "Guardar paneles"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+//       {/* Botón de guardar abajo también para tablas largas */}
+//       {dirty && rows.length > 4 && (
+//         <div className="mt-3 flex justify-end">
+//           <button
+//             onClick={handleSave}
+//             disabled={save.isPending}
+//             className="rounded-md bg-gray-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900"
+//           >
+//             {save.isPending ? "Guardando..." : "Guardar paneles"}
+//           </button>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
 
 // ─── Preview de fórmulas ──────────────────────────────────────────────────────
 

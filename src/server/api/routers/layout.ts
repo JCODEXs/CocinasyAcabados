@@ -78,16 +78,16 @@ export const layoutRouter = createTRPCRouter({
       const endpoint = await layoutService.getGroupEndpoint(input.sourceGroupId);
       const turnDelta = input.direction === "RIGHT" ? -90 : 90;
       const newAngle = endpoint.angle + turnDelta;
-
+console.log(endpoint,"endpoint")
       const count = await db.layoutGroup.count({ where: { projectId: source.projectId } });
 
       return db.layoutGroup.create({
         data: {
           projectId: source.projectId,
-          name:      input.name ?? `${source.name} (giro)`,
+          name:      input.name ?? `${source.name} (giro) ${input.direction}`,
           type:      source.type,
-          startX:    parseFloat(endpoint.x.toFixed(4)),
-          startY:    parseFloat(endpoint.z.toFixed(4)),
+         startX: Number((endpoint.x + (input.direction === "RIGHT" ? -10 : 10)).toFixed(4)),
+          startY:    parseFloat(endpoint.z.toFixed(4))+ (input.direction === "LEFT" ? 5 : -5),
           baseAngle: newAngle,
           sortOrder: count,
         },
