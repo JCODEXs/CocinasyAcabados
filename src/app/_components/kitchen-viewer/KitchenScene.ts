@@ -9,6 +9,7 @@ import type { RouterOutputs } from "@/trpc/react";
 import { KitchenObject, type MaterialConfig } from "./objects/KitchenObject";
 import { DynamicParametricObject } from "./objects/DynamicParametricObject";
 import type { ParametricObjectParams } from "./objects/ParametricObject";
+import type { ComponentTemplate, Material } from "@prisma/client";
 
 
 type Project    = RouterOutputs["quotes"]["getProject"];
@@ -26,7 +27,29 @@ type ElementCategory =
 type SceneMode = "REALISTIC" | "WIREFRAME" | "BLUEPRINT";
 
 // ─── Estado por item ──────────────────────────────────────────────────────────
+export interface TemplateForConstruction extends ComponentTemplate {
+  // Campos adicionales para la construcción en 3D
+  materialId: string | null;
+  defaultMaterial: Material | null;}
+export interface ParametricObjectParams2 {
+  width: number; // cm
+  height: number;
+  depth: number;
 
+  thicknessMM: number;
+  backThicknessMM: number;
+  zocalo: number;
+
+  assembly: "LATERAL_PASANTE" | "PISO_PASANTE";
+
+  templates: TemplateForConstruction[];
+
+  materialConfig?: MaterialConfig;
+
+  label?: string;
+  itemId?: string;
+  groupId?: string;
+}
 interface ItemState {
   item:          QuoteItem;
   primaryObj:    KitchenObject;              // instancia 0
@@ -251,7 +274,7 @@ console.log("bodycompo",item)
     };
   }
 
-private buildParametricParams(item: QuoteItem): ParametricObjectParams {
+private buildParametricParams(item: QuoteItem): ParametricObjectParams2 {
   
   return {
     width: item.width,

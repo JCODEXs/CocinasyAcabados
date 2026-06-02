@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
@@ -5,48 +7,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { ComponentTemplate, ComponentType } from "@prisma/client";
 import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
-// interface ParametricParams extends KitchenObjectParams {
-//   templates: ComponentTemplate[]; // Los paneles que vienen de tu API
-// }
-
-// export class DynamicParametricObject extends KitchenObject {
-//   templates: ComponentTemplate[];
-
-//   constructor(params: ParametricParams) {
-//     super(params);
-//     this.templates = params.templates;
-//     this.initialize();
-//   }
-
-//   protected build() {
-//     const { W, H, D } = this;
-    
-//     // Función evaluadora interna (similar a la del dashboard)
-//     const evalF = (formula: string) => {
-//       const parsed = formula.replace(/W/g, W.toString()).replace(/H/g, H.toString()).replace(/D/g, D.toString());
-//       return new Function(`return ${parsed}`)();
-//     };
-
-//     this.templates.forEach(panel => {
-//       const w = evalF(panel.widthFormula);
-//       const h = evalF(panel.heightFormula);
-//       const d = evalF(panel.depthFormula);
-//       const x = evalF(panel.posXFormula);
-//       const y = evalF(panel.posYFormula);
-//       const z = evalF(panel.posZFormula);
-//       const componentType="board"
-
-//       // Determinar material según el defaultMaterialCategory del panel
-//       let material = this.defaultBoardMat();
-//       if (panel.componentType === "PUERTA") material = this.defaultFinishMat();
-//       if (panel.componentType === "MESON") material = this.defaultCountertopMat();
-
-//       // Usar tu método existente addBox
-//       this.addBox(w, h, d, material, x, y, z, componentType );
-//     });
-//   }
-// }
-
+import * as THREE from "three"
 
 type FormulaContext = {
   W: number;  // ancho total (cm)
@@ -169,7 +130,7 @@ export class DynamicParametricObject extends KitchenObject {
       } else {
         category = "board";
         // Para tableros: usar color del material asignado
-        if (panel.defaultMaterial?.color) {
+        if (panel?.defaultMaterial?.color) {
           material = this.getMaterialFromColor(panel.defaultMaterial.color as string, 0.75, 0.02);
         } else {
           material = this.defaultBoardMat();
