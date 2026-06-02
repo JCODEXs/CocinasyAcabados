@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import type { ComponentTemplate, ComponentType } from "@prisma/client";
+import type { ComponentTemplate, ComponentType, Material } from "@prisma/client";
 import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
 import * as THREE from "three"
 
@@ -60,9 +60,13 @@ function buildContext(
     : H - ZO - 2 * T;   // techo y piso son continuos
     
   return { W, H, D, T, TF, ZO, IW, ID, IH };
+ interface TemplateForConstruction extends ComponentTemplate {
+    // Campos adicionales para la construcción en 3D
+    materialId: string | null;
+    defaultMaterial: Material | null;}
 }
 interface ParametricParams extends KitchenObjectParams {
-  templates: ComponentTemplate[];
+  templates: TemplateForConstruction[];
   // nuevos parámetros
   thicknessMM: number;
   backThicknessMM: number;
