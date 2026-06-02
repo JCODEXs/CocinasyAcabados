@@ -121,7 +121,9 @@ model ElementType {
   defaultDepth  Float?
 
   // Referencia al modelo Three.js
-  threeJsModel String // e.g. "LowerCabinet", "UpperCabinet"
+  thicknessMM Float @default(18)
+  backThicknessMM Float @default(15)
+  zocalo   Float @default(8)
 
   // Opciones permitidas
   allowCustomWidth  Boolean @default(true)
@@ -169,7 +171,6 @@ model Material {
   id        String  @id @default(cuid())
   catalogId String
   catalog   Catalog @relation(fields: [catalogId], references: [id])
-
   name        String
   category    MaterialCategory
   pricePerM2  Decimal          @db.Decimal(10, 2) // Precio por m² del tablero
@@ -538,6 +539,10 @@ model QuoteItem {
   width    Float
   height   Float
   depth    Float
+  thicknessMM Float @default(18)
+  backThicknessMM Float @default(15)
+  zocalo   Float @default(8)
+  assemblyType String @default("LATERAL_PASANTE")
   quantity Int   @default(1)
 
   // ── Precios ───────────────────────────────
@@ -560,14 +565,30 @@ model QuoteItemComponent {
   id          String    @id @default(cuid())
   quoteItemId String
   quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
-
+  componentTemplateId String 
   componentType ComponentType
   label         String?
 
   // Dimensiones reales (cm)
-  widthCm     Float
+  widthCm     Float 
   heightCm    Float
   thicknessMM Int
+
+   // Fórmulas relativas a dimensiones del mueble (W, H, D en cm)
+  widthFormula  String // "W" o "W - 3.6"
+  heightFormula String // "H - 3.6"
+  depthFormula  String @default("D")
+  posXFormula  String  @default("0")
+  posYFormula  String  @default("H / 2")
+  posZFormula  String  @default("0")
+
+  sortOrder Int @default(0)
+
+  // Qué aristas llevan canto visible
+  topEdge    Boolean @default(false)
+  bottomEdge Boolean @default(false)
+  leftEdge   Boolean @default(false)
+  rightEdge  Boolean @default(false)
 
   quantity Int @default(1)
 

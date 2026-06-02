@@ -51,6 +51,9 @@ import { ComponentTemplatesEditor } from "@/app/_components/quote-builder/Compon
 //   pricePerUnit: number;
 //   autoCalcRule: string;
 // }
+const Espesores = [
+  15,18,20,25,30,40
+] as const; // ✅ Usar 'as const' para inferir el tipo literal
 const COMPONENT_TYPES = [
   "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
   "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
@@ -84,7 +87,7 @@ interface ElementType {
   category: string;
   unit: string;
   basePrice: number;
-  threeJsModel: string;
+  thicknessMM: number;
   defaultWidth: number;
   defaultHeight: number;
   defaultDepth: number;
@@ -99,7 +102,7 @@ interface ElementTypeForm {
   category: string;
   unit: string;
   basePrice: number;
-  threeJsModel: string;
+  thicknessMM: number;
   defaultWidth: number;
   defaultHeight: number;
   defaultDepth: number;
@@ -224,7 +227,7 @@ function ElementTypesTab({ catalog, onSaved }: { catalog: any; onSaved: () => vo
 
   const empty = {
     name: "", category: "MUEBLE_BAJO", unit: "POR_ML",
-    basePrice: 0, threeJsModel: "LowerCabinet",
+    basePrice: 0, thicknessMM: 18,
     defaultWidth: 60, defaultHeight: 72, defaultDepth: 60,
     allowCustomWidth: true, allowCustomHeight: false, allowCustomDepth: false,
   };
@@ -243,10 +246,7 @@ const CHECKBOX_FIELDS = [
 ] as const; // TypeScript infers literal types
 
 type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
-  const THREE_JS_MODELS = [
-    "LowerCabinet", "UpperCabinet", "UpperCabinetGlass",
-    "Island", "Appliance", "WallPanel", "CountertopSection","DINAMICO"
-  ];
+ 
 
   return (
     <div className="space-y-4">
@@ -282,9 +282,9 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
               <input type="number" value={form.basePrice}
                 onChange={e => setForm(f => ({ ...f, basePrice: +e.target.value }))} className="input" />
             </Field> */}
-            <Field label="Modelo 3D">
-              <select value={form.threeJsModel} onChange={e => setForm(f => ({ ...f, threeJsModel: e.target.value }))} className="input">
-                {THREE_JS_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+            <Field label="Espesor de Lamina mm">
+              <select value={form.thicknessMM} onChange={e => setForm(f => ({ ...f, thicknessMM: +e.target.value }))} className="input">
+                {Espesores.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </Field>
             <Field label="Alto por defecto (cm)">
@@ -350,7 +350,7 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
                 <div>
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{et.name}</p>
                   <p className="text-xs text-gray-400">
-                    {CATEGORY_LABELS[et.category]} · {COP(Number(et.basePrice))} {UNIT_LABELS[et.unit]} · {et.threeJsModel}
+                    {CATEGORY_LABELS[et.category]} · {COP(Number(et.basePrice))} {UNIT_LABELS[et.unit]} ·
                     <span className="ml-2 text-gray-300 dark:text-gray-600">
                       {et.componentTemplates?.length ?? 0} paneles
                     </span>
@@ -370,6 +370,7 @@ type CheckboxKey = typeof CHECKBOX_FIELDS[number]["key"];
               <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 dark:border-gray-800 dark:bg-gray-800/30">
                 <ComponentTemplatesEditor
                   elementTypeId={et.id}
+                  elementType={et}
                   templates={et.componentTemplates ?? []}
                   onSaved={onSaved}
                 />

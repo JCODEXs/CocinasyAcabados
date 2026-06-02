@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
 
 import { useState } from "react";
@@ -16,9 +21,12 @@ import {
 type QuoteItem = RouterOutputs["quotes"]["getProject"]["layoutGroups"][number]["items"][number];
 
 export function QuoteItemCard({ item }: { item: QuoteItem }) {
-  const { projectId, invalidateProject } = useQuoteBuilder();
+  const { projectId, invalidateProject,project } = useQuoteBuilder();
+    const ItemOptimista=project?.layoutGroups
+    .flatMap(g => g?.items).find(i=>i.id===item?.id);
+
   const utils = api.useUtils();
-  const { updateDimension, isPending } = useOptimisticItem(item.id);
+  const { updateDimension, isPending } = useOptimisticItem(item?.id);
 
   // Pure UI state — fine to be local
   const [expanded,   setExpanded]   = useState(false);
@@ -92,19 +100,19 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
 
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
-            {item.label ?? item.elementType.name}
+            {item?.label ?? item?.elementType?.name}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
             {/* item comes directly from cache — always fresh */}
-            {item.width} × {item.height} × {item.depth} cm
-            {item.quantity > 1 && <> · ×{item.quantity}</>}
+            {ItemOptimista?.width} × {ItemOptimista?.height} × {ItemOptimista?.depth} cm
+            {(ItemOptimista?.quantity??-1) > 1 && <> · ×{ItemOptimista?.quantity}</>}
           </p>
         </div>
 
         <span className="shrink-0 min-w-[80px] text-right text-sm font-medium text-gray-900 dark:text-gray-100">
           {isPending
             ? <span className="inline-block h-3 w-16 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-            : `$${Number(item.totalPrice).toLocaleString("es-CO")}`
+            : `$${Number(ItemOptimista?.totalPrice).toLocaleString("es-CO")}`
           }
         </span>
 
@@ -127,33 +135,33 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
           <div className="flex items-center gap-2 bg-gray-50/60 px-3 py-2 dark:bg-gray-800/30">
             <DimensionInput
               label="Ancho"
-              value={item.width}
+              value={ItemOptimista?.width??item.width}
               unit="cm"
               disabled={!item.elementType.allowCustomWidth}
               onChange={v => updateDimension("width", v)}
             />
             <DimensionInput
               label="Alto"
-              value={item.height}
+              value={ItemOptimista?.height??item.height}
               unit="cm"
               disabled={!item.elementType.allowCustomHeight}
               onChange={v => updateDimension("height", v)}
             />
             <DimensionInput
               label="Fondo"
-              value={item.depth}
+              value={ItemOptimista?.depth??item?.depth}
               unit="cm"
               disabled={!item.elementType.allowCustomDepth}
               onChange={v => updateDimension("depth", v)}
             />
-            <DimensionInput
+            {/* <DimensionInput
               label="Cant."
               value={item.quantity}
               unit=""
               min={1}
               step={1}
               onChange={v => updateDimension("quantity", v)}
-            />
+            /> */}
             {isPending && (
               <span className="ml-auto text-xs text-gray-400">Calculando...</span>
             )}
@@ -182,9 +190,9 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
           <div className="p-3">
             {activeTab === "components" && (
               <div className="space-y-2">
-                {item.components.length === 0
+                {ItemOptimista?.components.length === 0
                   ? <p className="text-xs text-gray-400">Sin paneles. ¿El tipo de elemento tiene templates?</p>
-                  : item.components.map(comp => (
+                  : ItemOptimista?.components.map(comp => (
                       <ComponentEditor key={comp.id} component={comp} />
                     ))
                 }

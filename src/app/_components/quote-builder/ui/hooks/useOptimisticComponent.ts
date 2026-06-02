@@ -12,7 +12,6 @@ export function useOptimisticComponent(componentId: string) {
   const updateComponent = api.quotes.updateComponent.useMutation({
     onMutate: async (variables) => {
       await utils.quotes.getProject.cancel({ id: projectId });
-      const snapshot = utils.quotes.getProject.getData({ id: projectId });
 
       // Resolver material/acabado desde el catálogo local para que el swatch
       // se actualice INMEDIATAMENTE sin parpadeo ni swatch vacío.
@@ -30,7 +29,7 @@ export function useOptimisticComponent(componentId: string) {
             ? (catalog?.surfaceFinishes.find(f => f.id === variables.surfaceFinishId) ?? undefined)
             : undefined;
 
-      utils.quotes.getProject.setData({ id: projectId }, (old) => {
+     utils.quotes.getProject.setData({ id: projectId }, (old) => {
         if (!old) return old;
         return {
           ...old,
@@ -40,6 +39,12 @@ export function useOptimisticComponent(componentId: string) {
               ...item,
               components: item.components.map(comp => {
                 if (comp.id !== componentId) return comp;
+
+                    console.log('Updating component:', {
+            oldMaterialId: comp.materialId,
+            newMaterialId: newMaterial?.id,
+            variablesMaterialId: variables.materialId,
+          });
 
                 // Calcular precio optimista con los mismos boardAreaM2/finishAreaM2
                 const matPrice = newMaterial !== undefined
@@ -65,6 +70,9 @@ export function useOptimisticComponent(componentId: string) {
           })),
         };
       });
+
+      const snapshot = utils.quotes.getProject.getData({ id: projectId });
+
 
       return { snapshot };
     },

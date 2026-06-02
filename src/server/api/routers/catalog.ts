@@ -103,7 +103,7 @@ getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
       defaultWidth: z.number().positive().optional(),
       defaultHeight: z.number().positive().optional(),
       defaultDepth: z.number().positive().optional(),
-      threeJsModel: z.string().min(1),
+      thicknessMM: z.number().min(10),
       allowCustomWidth: z.boolean().default(true),
       allowCustomHeight: z.boolean().default(false),
       allowCustomDepth: z.boolean().default(false),
@@ -119,6 +119,68 @@ getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
     }),
 
   // ── ComponentTemplates de un ElementType ────────────────────────────────────
+getComponentTemplates: protectedProcedure
+  .input(z.object({ 
+    elementTypeId: z.string().min(1, "El ID del tipo de elemento es requerido")
+  }))
+  .query(async ({ ctx, input }) => {
+    const { elementTypeId } = input;
+    const userId = ctx.session.user.id;
+
+    // 1. Verificar que el usuario tiene acceso al catálogo
+    const catalog = await db.catalog.findFirst({
+      where: { 
+        OR: [
+          { userId: userId },
+          { isGlobal: true }
+        ]
+      }
+    });
+
+    if (!catalog) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No se encontró un catálogo asociado al usuario"
+      });
+    }
+
+    // 2. Verificar que el ElementType existe y pertenece al catálogo del usuario
+    const elementType = await db.elementType.findFirst({
+      where: {
+        id: elementTypeId,
+        catalogId: catalog.id
+      },
+      include: {
+        componentTemplates: {
+          orderBy: { sortOrder: "asc" }
+        }
+      }
+    });
+
+    if (!elementType) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `No se encontró el tipo de elemento con ID: ${elementTypeId}`
+      });
+    }
+
+    // 3. Retornar los templates
+    return {
+      elementType: {
+        id: elementType.id,
+        name: elementType.name,
+        category: elementType.category,
+      },
+      templates: elementType.componentTemplates,
+      summary: {
+        total: elementType.componentTemplates.length,
+        byType: elementType.componentTemplates.reduce((acc, t) => {
+          acc[t.componentType] = (acc[t.componentType] ?? 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      }
+    };
+  }),
 
   setComponentTemplates: protectedProcedure
     .input(z.object({
@@ -140,6 +202,7 @@ getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
         bottomEdge: z.boolean().default(false),
         leftEdge: z.boolean().default(false),
         rightEdge: z.boolean().default(false),
+        materialId:z.string().default("0"),
         defaultMaterialCategory: z.nativeEnum(MaterialCategory).nullable().optional(),
         defaultSurfaceFinishType: z.nativeEnum(SurfaceFinishType).nullable().optional(),
       })),
@@ -147,13 +210,93 @@ getFullCatalog: protectedProcedure.query(async ({ ctx }) => {
     .mutation(async ({ ctx, input }) => {
       const catalog = await getOrCreateCatalog(ctx.session.user.id);
       await assertOwnedById(db.elementType, input.elementTypeId, catalog.id);
+const existing = await db.componentTemplate.findMany({
+  where: {
+    elementTypeId: input.elementTypeId,
+  },
+});
+const existingMap = new Map(
+  existing.map(t => [t.id, t])
+);
 
-      await db.$transaction([
-        db.componentTemplate.deleteMany({ where: { elementTypeId: input.elementTypeId } }),
-        db.componentTemplate.createMany({
-          data: input.templates.map(({ id: _id, ...t }) => ({ ...t, elementTypeId: input.elementTypeId })),
-        }),
-      ]);
+const incomingMap = new Map(
+  input.templates
+    .filter(t => t.id)
+    .map(t => [t.id!, t])
+);
+const toDelete = existing.filter(
+  t => !incomingMap.has(t.id)
+);
+const toUpdate = input.templates.filter(
+  t => t.id && existingMap.has(t.id)
+);
+const toCreate = input.templates.filter(
+  t => !t.id
+);
+
+   await db.$transaction(async tx => {
+
+  await Promise.all(
+    toDelete.map(t =>
+      tx.componentTemplate.delete({
+        where: { id: t.id }
+      })
+    )
+  );
+
+    // Actualizar templates existentes
+    for (const template of toUpdate) {
+      await tx.componentTemplate.update({
+        where: { id: template.id! },
+        data: {
+          componentType: template.componentType,
+          label: template.label,
+          widthFormula: template.widthFormula,
+          heightFormula: template.heightFormula,
+          thicknessMM: template.thicknessMM,
+          depthFormula: template.depthFormula,
+          posXFormula: template.posXFormula,
+          posYFormula: template.posYFormula,
+          posZFormula: template.posZFormula,
+          quantity: template.quantity,
+          sortOrder: template.sortOrder,
+          topEdge: template.topEdge,
+          bottomEdge: template.bottomEdge,
+          leftEdge: template.leftEdge,
+          rightEdge: template.rightEdge,
+          defaultMaterialCategory: template.defaultMaterialCategory,
+          defaultSurfaceFinishType: template.defaultSurfaceFinishType,
+        }
+      });
+    }
+
+    // Crear nuevos templates
+    if (toCreate.length > 0) {
+      await tx.componentTemplate.createMany({
+        data: toCreate.map(template => ({
+          elementTypeId: input.elementTypeId,
+          componentType: template.componentType,
+          label: template.label,
+          widthFormula: template.widthFormula,
+          heightFormula: template.heightFormula,
+          thicknessMM: template.thicknessMM,
+          depthFormula: template.depthFormula,
+          posXFormula: template.posXFormula,
+          posYFormula: template.posYFormula,
+          posZFormula: template.posZFormula,
+          quantity: template.quantity,
+          sortOrder: template.sortOrder,
+          topEdge: template.topEdge,
+          bottomEdge: template.bottomEdge,
+          leftEdge: template.leftEdge,
+          rightEdge: template.rightEdge,
+          defaultMaterialCategory: template.defaultMaterialCategory,
+          defaultSurfaceFinishType: template.defaultSurfaceFinishType,
+        }))
+      });
+    }
+  
+});
     }),
 
   // ── Material ─────────────────────────────────────────────────────────────────

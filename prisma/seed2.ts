@@ -28,7 +28,7 @@ async function main() {
         catalogId: catalog.id,
         name: "MDF 18mm blanco",
         category: "MDF_LACADO",
-        pricePerM2: 85000,
+        pricePerM2: 45000,
         thicknessMM: 18,
         color: "#f0ede8",
         aiDescription: "white lacquered MDF, smooth matte finish",
@@ -343,172 +343,6 @@ async function main() {
     }),
   ]);
 
-  // ── Tipos de elemento con templates de componentes ────────────────────────
-  const elementTypes = await Promise.all([
-    db.elementType.upsert({
-      where: { id: "seed-et-mueble-bajo" },
-      create: {
-        id: "seed-et-mueble-bajo",
-        catalogId: catalog.id,
-        name: "Mueble bajo estándar",
-        category: "MUEBLE_BAJO",
-        unit: "POR_UNIDAD",
-        basePrice: 350000,
-        defaultWidth: 60,
-        defaultHeight: 72,
-        defaultDepth: 60,
-        threeJsModel: "LowerCabinet",
-        allowCustomWidth: true,
-        allowCustomHeight: false,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-mueble-alto" },
-      create: {
-        id: "seed-et-mueble-alto",
-        catalogId: catalog.id,
-        name: "Mueble alto estándar",
-        category: "MUEBLE_ALTO",
-        unit: "POR_UNIDAD",
-        basePrice: 280000,
-        defaultWidth: 60,
-        defaultHeight: 80,
-        defaultDepth: 35,
-        threeJsModel: "UpperCabinet",
-        allowCustomWidth: true,
-        allowCustomHeight: false,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-isla" },
-      create: {
-        id: "seed-et-isla",
-        catalogId: catalog.id,
-        name: "Isla central",
-        category: "MUEBLE_BAJO",
-        unit: "POR_UNIDAD",
-        basePrice: 850000,
-        defaultWidth: 120,
-        defaultHeight: 90,
-        defaultDepth: 90,
-        threeJsModel: "Island",
-        allowCustomWidth: true,
-        allowCustomHeight: false,
-        allowCustomDepth: true,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-refrigerador" },
-      create: {
-        id: "seed-et-refrigerador",
-        catalogId: catalog.id,
-        name: "Módulo refrigerador",
-        category: "ELECTRODOMESTICO",
-        unit: "POR_UNIDAD",
-        basePrice: 0,
-        defaultWidth: 70,
-        defaultHeight: 180,
-        defaultDepth: 70,
-        threeJsModel: "Appliance",
-        allowCustomWidth: false,
-        allowCustomHeight: false,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-horno" },
-      create: {
-        id: "seed-et-horno",
-        catalogId: catalog.id,
-        name: "Módulo horno empotrado",
-        category: "ELECTRODOMESTICO",
-        unit: "POR_UNIDAD",
-        basePrice: 0,
-        defaultWidth: 60,
-        defaultHeight: 60,
-        defaultDepth: 55,
-        threeJsModel: "Appliance",
-        allowCustomWidth: false,
-        allowCustomHeight: false,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-meson" },
-      create: {
-        id: "seed-et-meson",
-        catalogId: catalog.id,
-        name: "Mesón corrido",
-        category: "MESON",
-        unit: "POR_ML",
-        basePrice: 180000,
-        defaultWidth: 100,
-        defaultHeight: 4,
-        defaultDepth: 62,
-        threeJsModel: "CountertopSection",
-        allowCustomWidth: true,
-        allowCustomHeight: false,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-    db.elementType.upsert({
-      where: { id: "seed-et-panel-yeso" },
-      create: {
-        id: "seed-et-panel-yeso",
-        catalogId: catalog.id,
-        name: "Panel yeso Drywall",
-        category: "PANEL_YESO",
-        unit: "POR_M2",
-        basePrice: 45000,
-        defaultWidth: 120,
-        defaultHeight: 240,
-        defaultDepth: 10,
-        threeJsModel: "WallPanel",
-        allowCustomWidth: true,
-        allowCustomHeight: true,
-        allowCustomDepth: false,
-      },
-      update: {},
-    }),
-  ]);
-
-  // ── ComponentTemplates para mueble bajo ──────────────────────────────────
-  const muebBajo = elementTypes[0]!;
-  await db.componentTemplate.deleteMany({ where: { elementTypeId: muebBajo.id } });
-  await db.componentTemplate.createMany({
-    data: [
-      { elementTypeId: muebBajo.id, componentType: "LATERAL",   label: "Lateral izquierdo", widthFormula: "D",     heightFormula: "H - 8",  depthFormula: "D",     thicknessMM: 18, quantity: 1, sortOrder: 0, topEdge: false, bottomEdge: false, leftEdge: true, rightEdge: false },
-      { elementTypeId: muebBajo.id, componentType: "LATERAL",   label: "Lateral derecho",   widthFormula: "D",     heightFormula: "H - 8",  depthFormula: "D",     thicknessMM: 18, quantity: 1, sortOrder: 1, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: true },
-      { elementTypeId: muebBajo.id, componentType: "FONDO",     label: "Fondo",             widthFormula: "W - 3.6",heightFormula: "H - 8",  depthFormula: "D",     thicknessMM: 9,  quantity: 1, sortOrder: 2, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebBajo.id, componentType: "PISO",      label: "Piso",              widthFormula: "W - 3.6",heightFormula: "D",      depthFormula: "D",     thicknessMM: 18, quantity: 1, sortOrder: 3, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebBajo.id, componentType: "TECHO",     label: "Techo interno",     widthFormula: "W - 3.6",heightFormula: "D",      depthFormula: "D",     thicknessMM: 18, quantity: 1, sortOrder: 4, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebBajo.id, componentType: "PUERTA",    label: "Puerta",            widthFormula: "W / 2", heightFormula: "H - 11", depthFormula: "D",     thicknessMM: 18, quantity: 2, sortOrder: 5, topEdge: true,  bottomEdge: true,  leftEdge: true,  rightEdge: true,  defaultSurfaceFinishType: "LACADO" },
-      { elementTypeId: muebBajo.id, componentType: "MESON",     label: "Mesón",             widthFormula: "W + 2", heightFormula: "D + 4",  depthFormula: "D",     thicknessMM: 20, quantity: 1, sortOrder: 6, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false, defaultMaterialCategory: "GRANITO" },
-    ],
-  });
-
-  // ── ComponentTemplates para mueble alto ──────────────────────────────────
-  const muebAlto = elementTypes[1]!;
-  await db.componentTemplate.deleteMany({ where: { elementTypeId: muebAlto.id } });
-  await db.componentTemplate.createMany({
-    data: [
-      { elementTypeId: muebAlto.id, componentType: "LATERAL",   label: "Lateral izquierdo", widthFormula: "D",      heightFormula: "H",       depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 0, topEdge: false, bottomEdge: false, leftEdge: true,  rightEdge: false },
-      { elementTypeId: muebAlto.id, componentType: "LATERAL",   label: "Lateral derecho",   widthFormula: "D",      heightFormula: "H",       depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 1, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: true  },
-      { elementTypeId: muebAlto.id, componentType: "FONDO",     label: "Fondo",             widthFormula: "W - 3.6",heightFormula: "H",       depthFormula: "D", thicknessMM: 9,  quantity: 1, sortOrder: 2, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebAlto.id, componentType: "TECHO",     label: "Techo",             widthFormula: "W - 3.6",heightFormula: "D",       depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 3, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebAlto.id, componentType: "PISO",      label: "Piso interno",      widthFormula: "W - 3.6",heightFormula: "D",       depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 4, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebAlto.id, componentType: "ENTREPAÑO", label: "Entrepaño",         widthFormula: "W - 3.6",heightFormula: "D - 2",   depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 5, topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false },
-      { elementTypeId: muebAlto.id, componentType: "PUERTA",    label: "Puerta",            widthFormula: "W - 1.8",heightFormula: "H - 1.8", depthFormula: "D", thicknessMM: 18, quantity: 1, sortOrder: 6, topEdge: true,  bottomEdge: true,  leftEdge: true,  rightEdge: true,  defaultSurfaceFinishType: "LACADO" },
-    ],
-  });
 
   console.log("✅ Seed completado exitosamente");
   console.log(`   - ${materials.length} materiales`);
@@ -516,7 +350,6 @@ async function main() {
   console.log(`   - 4 cantos`);
   console.log(`   - 3 insumos de ensamble`);
   console.log(`   - 3 acabados de obra`);
-  console.log(`   - ${elementTypes.length} tipos de elemento con templates`);
 }
 
 main()

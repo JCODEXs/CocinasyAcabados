@@ -36,6 +36,17 @@ const addQuoteItemSchema = z.object({
   width:         z.number().positive(),
   height:        z.number().positive(),
   depth:         z.number().positive(),
+  thicknessMM:    z.number().positive(),
+  backThicknessMM:z.number().positive(),
+  // componentTemplateId: z.string(),
+  // widthFormula: z.string().min(1),
+  // heightFormula: z.string().min(1),
+  // depthFormula: z.string().default("D"),
+  // posXFormula: z.string().default("0"),
+  // posYFormula: z.string().default("H / 2"),
+  // posZFormula: z.string().default("0"),
+  zocalo:        z.number().positive(),
+  assemblyType:  z.string().optional(),
   quantity:      z.number().int().positive().default(1),
   layoutGroupId: z.string().optional(),
   groupOrder:    z.number().int().default(0),
@@ -48,7 +59,18 @@ const updateQuoteItemSchema = z.object({
   height:          z.number().positive().optional(),
   depth:           z.number().positive().optional(),
   quantity:        z.number().int().positive().optional(),
-  notes:           z.string().optional(),
+  thicknessMM:    z.number().positive().optional(),
+  // componentTemplateId: z.string(),
+  // widthFormula: z.string().min(1),
+  // heightFormula: z.string().min(1),
+  // depthFormula: z.string().default("D"),
+  // posXFormula: z.string().default("0"),
+  // posYFormula: z.string().default("H / 2"),
+  // posZFormula: z.string().default("0"),
+  backThicknessMM:z.number().positive().optional(),
+  zocalo:        z.number().positive().optional(),
+  assemblyType:  z.string().optional().optional(),
+  notes:           z.string().optional().optional(),
   connectionToNext: ConnectionTypeSchema.optional(),   // ← z.enum, no z.nativeEnum
   gapBeforeCm:     z.number().min(0).optional(),
 });
@@ -117,7 +139,7 @@ export const quotesRouter = createTRPCRouter({
             items: {
               orderBy: { groupOrder: "asc" },
               include: {
-                elementType:  true,
+                elementType: true,
                 components: {
                   include: {
                     material:     true,

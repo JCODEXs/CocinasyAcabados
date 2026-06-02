@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import type { ComponentTemplate } from "@prisma/client";
 import * as THREE from "three";
 
 // ============================================
@@ -41,6 +42,13 @@ export interface KitchenObjectParams {
   groupId?:        string;
   itemId?:         string;
 }
+interface ParametricParams extends KitchenObjectParams {
+  templates: ComponentTemplate[];
+  thicknessMM: number;
+  backThicknessMM: number;
+  zocalo: number;
+  assembly: "LATERAL_PASANTE" | "PISO_PASANTE";
+}
 
 // Extensión de userData — Three.js lo declara como Record<string, any>
 // así que no podemos re-declarar con declare, usamos una interfaz separada
@@ -56,7 +64,7 @@ export interface KitchenObjectUserData {
 // ============================================
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
-const materialCache = new Map<string, THREE.MeshStandardMaterial>();
+export const materialCache = new Map<string, THREE.MeshStandardMaterial>();
 const textureCache  = new Map<string, THREE.Texture>();
 const textureLoader = new THREE.TextureLoader();
 
@@ -84,7 +92,7 @@ function getCylinderGeometry(
   return geo;
 }
 
-function loadTexture(url: string): THREE.Texture {
+export function loadTexture(url: string): THREE.Texture {
   const cached = textureCache.get(url);
   if (cached) return cached;
   const tex = textureLoader.load(url);
@@ -152,7 +160,7 @@ export function disposeKitchenCaches(): void {
 // ============================================
 
 export abstract class KitchenObject extends THREE.Group {
-  protected params: KitchenObjectParams;
+  protected params: ParametricParams
 
   // Typed userData helper — accedemos vía getter para mantener tipado
   get kitchenData(): KitchenObjectUserData {
@@ -168,9 +176,11 @@ export abstract class KitchenObject extends THREE.Group {
   private _selected = false;
   private _selectionEdges?: THREE.LineSegments;
 
-  constructor(params: KitchenObjectParams) {
+  constructor(params: ParametricParams) {
     super();
-    this.params = params;
+    this.params = params
+
+
 
     // userData es Record<string,any> en Three.js — asignamos con cast
     const ud = this.userData as KitchenObjectUserData;
@@ -184,9 +194,9 @@ export abstract class KitchenObject extends THREE.Group {
   protected initialize() {
   this.build();
 
-  if (this.params.materialConfig) {
-    this.applyMaterialConfig(this.params.materialConfig);
-  }
+  // if (this.params.materialConfig) {
+  //   this.applyMaterialConfig(this.params.materialConfig);
+  // }
 }
 
   // ─── API pública ─────────────────────────────────────────────────────────
@@ -309,6 +319,11 @@ export abstract class KitchenObject extends THREE.Group {
   protected defaultFinishMat():     THREE.MeshStandardMaterial { return getStdMaterial("#e8e0d8", undefined, 0.65, 0.03); }
   protected defaultCountertopMat(): THREE.MeshStandardMaterial { return getStdMaterial("#404855", undefined, 0.30, 0.08); }
   protected defaultHandleMat():     THREE.MeshStandardMaterial { return getHandleMaterial("#c0a060", "ESTANDAR"); }
+
+  protected getMaterialFromColor(colorHex: string, roughness = 0.7, metalness = 0.05): THREE.MeshStandardMaterial {
+    const validColor = (colorHex?.startsWith("#") ? colorHex : `#${colorHex}`) as HexColor;
+    return getStdMaterial(validColor, undefined, roughness, metalness);
+  }
 
   // ─── Lifecycle privado ────────────────────────────────────────────────────
 

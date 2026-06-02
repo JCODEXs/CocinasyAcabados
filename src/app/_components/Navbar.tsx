@@ -54,7 +54,7 @@ export function Navbar() {
             </Link>
 
             {/* Acción rápida */}
-            {isProjects && (
+            {/* {isProjects && (
               <Link
                 href="/projects/new"
                 className="flex items-center gap-2 text-sm font-medium bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition"
@@ -62,7 +62,7 @@ export function Navbar() {
                 <Plus size={16} />
                 Nuevo Proyecto
               </Link>
-            )}
+            )} */}
           </div>
 
           {/* Lado derecho */}

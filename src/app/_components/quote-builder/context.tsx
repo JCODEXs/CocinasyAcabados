@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  createContext, useContext, useState,
+  createContext, useContext, useState,useEffect,
   useCallback, type ReactNode,
 } from "react";
 import { api } from "@/trpc/react";
@@ -49,6 +49,7 @@ export function QuoteBuilderProvider({
 }) {
   const utils = api.useUtils();
 
+
   // ── UI state only ────────────────────────────────────────────────────────
   const [selection,       setSelection]       = useState<Selection>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export function QuoteBuilderProvider({
       refetchOnWindowFocus: false,
     }
   );
+
 
   const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, {
     initialData:          initialCatalog ?? undefined,

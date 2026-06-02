@@ -27,11 +27,18 @@ interface ComponentRow {
   id:              string;
   quoteItemId:     string;
   componentType:   ComponentType;
+  componentTemplateId: string;
   label:           string | null;
   widthCm:         number;
   heightCm:        number;
   thicknessMM:     number;
   quantity:        number;
+  widthFormula: string,
+  heightFormula: string,
+  depthFormula: string,
+  posXFormula: string,
+  posYFormula: string,
+  posZFormula: string,
   materialId:      string | null;
   surfaceFinishId: string | null;
   boardAreaM2:     number;
@@ -72,6 +79,7 @@ function evalFormula(
   T:number,
   IW:number,
   ID:number,
+  IH:number,
 ): number {
   // Reemplazar variables — \b asegura que no toca "WIDTH", "DEPTH", etc.
   const expr = formula
@@ -82,6 +90,7 @@ function evalFormula(
     .replace(/\bT\b/g, String(T))
     .replace(/\bIW\b/g, String(IW))
     .replace(/\bID\b/g, String(ID))
+    .replace(/\bIH\b/g, String(IH))
     .replace(/\bD\b/g, String(D));
 
   // Validar que solo contenga caracteres seguros antes de evaluar
@@ -156,6 +165,7 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   const T=1.8
   const IW=W-2*T
   const ID = D-2*T
+  const IH = H - ZO - 2 * T;   // techo y piso son continuos
   const templates = item.elementType.componentTemplates;
 
   // Fetch paralelo de recursos del catálogo
@@ -210,10 +220,10 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   let totalBoardArea = 0;
 
   for (const tmpl of templates) {
-    const compW = evalFormula(tmpl.widthFormula,      W, H, D,ZO,T,IW,ID);
-    const compH = evalFormula(tmpl.heightFormula,     W, H, D,ZO,T,IW,ID);
+    const compW = evalFormula(tmpl.widthFormula,      W, H, D,ZO,T,IW,ID,IH);
+    const compH = evalFormula(tmpl.heightFormula,     W, H, D,ZO,T,IW,ID,IH);
     // depthFormula tiene @default("D") en el schema — siempre existe
-    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D,ZO,T,IW,ID);
+    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D,ZO,T,IW,ID,IH);
     let faceWidth: number, faceHeight: number, thicknessCm: number;
 switch (tmpl.componentType) {
   case "LATERAL":
@@ -254,10 +264,17 @@ const areaM2 = (faceWidth * faceHeight * tmpl.quantity) / 10000;
       id:              componentId,
       quoteItemId,
       componentType:   tmpl.componentType as ComponentType,
+      componentTemplateId: tmpl.id,
       label:           tmpl.label ?? null,
       widthCm:         faceWidth,
       heightCm:        faceHeight,
       thicknessMM:     tmpl.thicknessMM,
+      widthFormula:  tmpl.widthFormula,
+      heightFormula: tmpl.heightFormula,
+      depthFormula:  tmpl.depthFormula,
+      posXFormula:   tmpl.posXFormula,
+      posYFormula:   tmpl.posYFormula,
+      posZFormula:   tmpl.posZFormula,
       quantity:        tmpl.quantity,
       materialId:      mat?.id ?? null,
       surfaceFinishId: fin?.id ?? null,

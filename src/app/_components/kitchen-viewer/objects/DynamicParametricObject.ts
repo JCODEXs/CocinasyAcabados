@@ -5,7 +5,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { ComponentTemplate, ComponentType } from "@prisma/client";
 import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
-
 // interface ParametricParams extends KitchenObjectParams {
 //   templates: ComponentTemplate[]; // Los paneles que vienen de tu API
 // }
@@ -49,7 +48,6 @@ import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
 // }
 
 
-
 type FormulaContext = {
   W: number;  // ancho total (cm)
   H: number;  // alto total (cm)
@@ -79,7 +77,7 @@ function evaluateFormula(formula: string, ctx: FormulaContext): number {
     if (typeof result !== 'number' || !isFinite(result)) {
       throw new Error(`Formula result not a number: ${formula} -> ${result}`);
     }
-    return Math.max(0, result);
+    return Math.max(-2000, result);
   } catch (err) {
     console.warn(`Error evaluating formula "${formula}":`, err);
     return 0;
@@ -90,8 +88,8 @@ function buildContext(
   thicknessMM: number, backThicknessMM: number,
   zocalo: number, assembly: "LATERAL_PASANTE" | "PISO_PASANTE"
 ): FormulaContext {
-  const T = thicknessMM / 10;
-  const TF = backThicknessMM / 10;
+  const T = thicknessMM;
+  const TF = backThicknessMM;
   const ZO = zocalo;
   const IW = W - 2 * T;
   const ID = D - TF;
@@ -99,6 +97,7 @@ function buildContext(
   const IH = assembly === "LATERAL_PASANTE"
     ? H - ZO - T        // techo apoya sobre laterales
     : H - ZO - 2 * T;   // techo y piso son continuos
+    
   return { W, H, D, T, TF, ZO, IW, ID, IH };
 }
 interface ParametricParams extends KitchenObjectParams {
@@ -123,34 +122,63 @@ export class DynamicParametricObject extends KitchenObject {
       zocalo: params.zocalo,
       assembly: params.assembly,
     };
+    console.log(this.templates?.[0],"templates",params)
     this.initialize();
   }
 
   protected build() {
     const { W, H, D } = this;
     const ctx = buildContext(
-      W, H, D,
-      this.config.thicknessMM,
-      this.config.backThicknessMM,
+      W*100, H*100, D*100,
+      this.config.thicknessMM/10,
+      this.config.backThicknessMM/10,
       this.config.zocalo,
       this.config.assembly
     );
+    console.log(this.templates,ctx,"context")
 
     this.templates.forEach(panel => {
-      const w = evaluateFormula(panel.widthFormula, ctx);
-      const h = evaluateFormula(panel.heightFormula, ctx);
-      const d = evaluateFormula(panel.depthFormula, ctx);
-      const x = evaluateFormula(panel.posXFormula, ctx);
-      const y = evaluateFormula(panel.posYFormula, ctx);
-      const z = evaluateFormula(panel.posZFormula, ctx);
+      const w = evaluateFormula(panel.widthFormula, ctx)/100;
+      const h = evaluateFormula(panel.heightFormula, ctx)/100;
+      const d = evaluateFormula(panel.depthFormula, ctx)/100;
+      const x = (evaluateFormula(panel.posXFormula, ctx)/100);
+      const y = evaluateFormula(panel.posYFormula, ctx)/100;
+      const z = (evaluateFormula(panel.posZFormula, ctx)/100)
 
       if (w <= 0 || h <= 0 || d <= 0) return;
 
-      let material = this.defaultBoardMat();
-      if (panel.componentType === "PUERTA") material = this.defaultFinishMat();
-      if (panel.componentType === "MESON") material = this.defaultCountertopMat();
+      let material: THREE.MeshStandardMaterial | undefined;
+      let category: "board" | "finish" | "countertop" | "handle" | "none" = "board";
 
-      this.addBox(w, h, d, material, x, y, z, "board");
+      // Determinar material y categoría según tipo de componente
+      if (panel.componentType === "PUERTA" || panel.componentType === "FRENTE_CAJON") {
+        category = "finish";
+        // Si panel tiene material, usar su color; si no, usar default
+        if (panel.defaultMaterial?.color) {
+          material = this.getMaterialFromColor(panel.defaultMaterial.color as string, 0.65, 0.03);
+        } else {
+          material = this.defaultFinishMat();
+        }
+      } else if (panel.componentType === "MESON") {
+        category = "countertop";
+        if (panel.defaultMaterial?.color) {
+          material = this.getMaterialFromColor(panel.defaultMaterial.color as string, 0.30, 0.08);
+        } else {
+          material = this.defaultCountertopMat();
+        }
+      } else {
+        category = "board";
+        // Para tableros: usar color del material asignado
+        if (panel.defaultMaterial?.color) {
+          material = this.getMaterialFromColor(panel.defaultMaterial.color as string, 0.75, 0.02);
+        } else {
+          material = this.defaultBoardMat();
+        }
+      }
+
+      if (material) {
+        this.addBox(w, h, d, material, x, y, z, category);
+      }
     });
   }
 }

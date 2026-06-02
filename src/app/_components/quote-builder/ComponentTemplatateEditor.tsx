@@ -9,7 +9,7 @@ import { useState, useCallback, Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Edges, Grid, GizmoHelper, GizmoViewport } from "@react-three/drei";
 import { api } from "@/trpc/react";
-import type {MaterialCategory,SurfaceFinishType} from "@prisma/client"
+import type {ElementType, MaterialCategory,SurfaceFinishType} from "@prisma/client"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -276,16 +276,16 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     label: "División vertical", icon: "▮", description: "Divisor interno de ancho T",
     row: () => ({
       componentType: "DIVISION", label: "División",
-      widthFormula: "T", heightFormula: "IH", depthFormula: "ID",
-      posXFormula: "0", posYFormula: "H / 2", posZFormula: "T / 2",
+      widthFormula: "T", heightFormula: "IH-ZO-2*T", depthFormula: "ID",
+      posXFormula: "0", posYFormula: "(H+ZO-2*T) / 2", posZFormula: "T / 2",
     }),
   },
   {
     label: "Puerta", icon: "▭", description: "Frente de puerta con descuento de dilatación",
     row: () => ({
       componentType: "PUERTA", label: "Puerta",
-      widthFormula: "W - 0.4", heightFormula: "H - 0.4", depthFormula: "T",
-      posXFormula: "0", posYFormula: "H / 2", posZFormula: "D / 2 + T / 2",
+      widthFormula: "(W - 0.4)/2", heightFormula: "H-ZO- 4", depthFormula: "T",
+      posXFormula: "-(W - 0.4)/4", posYFormula: "(H +ZO)/ 2", posZFormula: "D / 2 + T / 2",
       topEdge: true, bottomEdge: true, leftEdge: true, rightEdge: true,
       defaultSurfaceFinishType: "LACADO",
     }),
@@ -680,6 +680,7 @@ const emptyRow = (sort = 0): TemplateRow => ({
 });
 
 export function ComponentTemplatesEditor({
+  elementType,
   elementTypeId,
   templates,
   onSaved,
@@ -687,6 +688,7 @@ export function ComponentTemplatesEditor({
 }: {
   elementTypeId: string;
   templates:     any[];
+  elementType: ElementType,
   onSaved:       () => void;
 }) {
   const [rows, setRows] = useState<TemplateRow[]>(() =>
@@ -711,9 +713,9 @@ export function ComponentTemplatesEditor({
 
   // Dimensiones de preview ajustables
   const [thicknessMM, setthicknessMM] = useState(2);
-  const [previewW, setPreviewW] = useState(80);
-  const [previewH, setPreviewH] = useState(72);
-  const [previewD, setPreviewD] = useState(60);
+  const [previewW, setPreviewW] = useState(elementType.defaultWidth??80);
+  const [previewH, setPreviewH] = useState(elementType.defaultHeight??70);
+  const [previewD, setPreviewD] = useState(elementType.defaultDepth??60);
   const [highlightIdx, setHighlightIdx] = useState<number | null>(null);
 
   const [dirty,          setDirty]         = useState(false);

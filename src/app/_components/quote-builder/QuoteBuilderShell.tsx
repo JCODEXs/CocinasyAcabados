@@ -49,11 +49,11 @@ export function QuoteBuilderShell() {
       icon: <ViewColumnsIcon className="h-3.5 w-3.5" />,
       label: "Vista completa",
     },
-    {
-      mode: "floorplan",
-      icon: <MapIcon className="h-3.5 w-3.5" />,
-      label: "Plano 2D",
-    },
+    // {
+    //   mode: "floorplan",
+    //   icon: <MapIcon className="h-3.5 w-3.5" />,
+    //   label: "Plano 2D",
+    // },
     {
       mode: "3d",
       icon: <CubeTransparentIcon className="h-3.5 w-3.5" />,
@@ -62,10 +62,10 @@ export function QuoteBuilderShell() {
   ];
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-950">
+    <div className="flex relative  h-dvh flex-col bg-gray-50 dark:bg-gray-950">
 
       {/* ── Topbar ───────────────────────────────────────────────────────── */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+      <header className="flex  sticky h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {project.name}
@@ -76,7 +76,7 @@ export function QuoteBuilderShell() {
           <StatusBadge status={project.status} />
         </div>
 
-        <div className="flex items-center gap-2">
+     {   viewMode === "3d" && <div className="flex items-center gap-2 absolute sticky">
           {/* View mode toggle */}
           <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
             {VIEW_BUTTONS.map(({ mode, icon, label }) => (
@@ -101,7 +101,7 @@ export function QuoteBuilderShell() {
               ${Number(total).toLocaleString("es-CO",{ minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
-        </div>
+        </div>}
       </header>
 
       {/* ── Vista 3D — ocupa toda la pantalla sin sidebars ───────────────── */}
@@ -117,6 +117,26 @@ export function QuoteBuilderShell() {
 
           {/* Col 1: Catálogo — lee del contexto, no necesita props */}
           <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+            
+    
+          <div className=" mt-5">
+            <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
+              {VIEW_BUTTONS.map(({ mode, icon, label }) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors ${
+                    viewMode === mode
+                      ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
             <CatalogSidebar />
           </aside>
 
