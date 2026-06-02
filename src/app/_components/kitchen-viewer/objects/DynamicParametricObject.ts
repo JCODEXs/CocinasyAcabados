@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -5,9 +6,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import type { ComponentTemplate, ComponentType, Material } from "@prisma/client";
 import { KitchenObject, type KitchenObjectParams } from "./KitchenObject";
 import * as THREE from "three"
+import type { TemplateForConstruction } from "../KitchenScene";
 
 type FormulaContext = {
   W: number;  // ancho total (cm)
@@ -60,13 +61,10 @@ function buildContext(
     : H - ZO - 2 * T;   // techo y piso son continuos
     
   return { W, H, D, T, TF, ZO, IW, ID, IH };
- interface TemplateForConstruction extends ComponentTemplate {
-    // Campos adicionales para la construcción en 3D
-    materialId: string | null;
-    defaultMaterial: Material | null;}
+
 }
 interface ParametricParams extends KitchenObjectParams {
-  templates: TemplateForConstruction[];
+  templates: TemplateForConstruction[]
   // nuevos parámetros
   thicknessMM: number;
   backThicknessMM: number;
@@ -75,7 +73,7 @@ interface ParametricParams extends KitchenObjectParams {
 }
 
 export class DynamicParametricObject extends KitchenObject {
-  private templates: ComponentTemplate[];
+  private templates: TemplateForConstruction[]
   private config: Omit<ParametricParams, keyof KitchenObjectParams | 'templates'>;
 
   constructor(params: ParametricParams) {
