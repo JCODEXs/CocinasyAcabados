@@ -57,7 +57,7 @@ export function PortalClient({
     
   );
 type QuoteItem = PortalProject["layoutGroups"][number]["items"][number];
-  const allItems: QuoteItemsArray = project.layoutGroups.flatMap(g => g.items);
+const allItems: QuoteItemsArray = project.layoutGroups.flatMap((g: LayoutGroup) => g.items);
   const statusInfo = STATUS_INFO[project.status] ?? STATUS_INFO.SENT;
 
   return (
