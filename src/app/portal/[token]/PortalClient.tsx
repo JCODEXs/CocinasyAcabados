@@ -217,7 +217,7 @@ function OverviewSection({ project, allItems }: {
                   {group.items.length} elementos
                 </span>
               </div>
-              {group.items.map(item => (
+              {group.items.map((item:QuoteItem) => (
                 <div key={item.id} style={{
                   padding: "8px 16px",
                   display: "flex", justifyContent: "space-between",
@@ -244,7 +244,7 @@ function OverviewSection({ project, allItems }: {
         {project.projectFinishes.length > 0 && (
           <>
             <SectionTitle style={{ marginTop: 28 }}>Acabados de obra</SectionTitle>
-            {project.projectFinishes.map(pf => (
+            {project.projectFinishes.map((pf:ProjectFinish) => (
               <div key={pf.id} style={{
                 display: "flex", justifyContent: "space-between",
                 padding: "8px 0", borderBottom: "1px solid rgba(0,0,0,0.06)",
@@ -334,7 +334,7 @@ function DetailsSection({ project, allItems }: {
       <SectionTitle>Desglose de elementos</SectionTitle>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 1, background: "rgba(0,0,0,0.04)", borderRadius: 12, overflow: "hidden" }}>
-        {allItems.map(item => {
+        {allItems.map((item:QuoteItem) => {
           const isOpen = openItem === item.id;
           return (
             <div key={item.id} style={{ background: "#faf8f5" }}>
@@ -372,7 +372,7 @@ function DetailsSection({ project, allItems }: {
                       <p style={{ fontFamily: "system-ui", fontSize: 11, letterSpacing: "0.1em", color: "#aaa", marginBottom: 8 }}>
                         PANELES
                       </p>
-                      {item.components.map(comp => (
+                      {item.components.map((comp:Component) => (
                         <div key={comp.id} style={{
                           display: "flex", gap: 12, alignItems: "flex-start",
                           padding: "8px 0", borderBottom: "1px solid rgba(0,0,0,0.04)",
@@ -410,7 +410,7 @@ function DetailsSection({ project, allItems }: {
                       <p style={{ fontFamily: "system-ui", fontSize: 11, letterSpacing: "0.1em", color: "#aaa", marginBottom: 8 }}>
                         HERRAJES
                       </p>
-                      {item.hardwareItems.map(hw => (
+                      {item.hardwareItems.map((hw:HardwareItem) => (
                         <div key={hw.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontFamily: "system-ui", fontSize: 13 }}>
                           <span style={{ color: "#444" }}>
                             {hw.hardware.name}
@@ -505,7 +505,7 @@ function CustomizeSection({ project, token, onSubmitted }: {
 
       {/* Per-component notes */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 40 }}>
-        {allComponents.map(comp => (
+        {allComponents.map((comp:Component) => (
           <div key={comp.id} style={{
             display: "flex", gap: 16, alignItems: "flex-start",
             padding: "16px", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 10,
