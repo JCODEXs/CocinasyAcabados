@@ -203,7 +203,7 @@ function OverviewSection({ project, allItems }: {
       <div>
         <SectionTitle>Distribución</SectionTitle>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {byGroup.map(group => (
+          {byGroup.map((group:LayoutGroup) => (
             <div key={group.id} style={{
               border: "1px solid rgba(0,0,0,0.08)",
               borderRadius: 10, overflow: "hidden",
