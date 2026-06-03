@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
 
@@ -11,8 +11,16 @@ import { api } from "@/trpc/react";
 import type { RouterOutputs } from "@/trpc/react";
 import { KitchenViewer } from "@/app/_components/kitchen-viewer/KitchenViewer";
 import { QuoteBuilderProvider } from "@/app/_components/quote-builder/context";
+export type PortalProject = RouterOutputs["portal"]["getByToken"];
+export type LayoutGroup = PortalProject["layoutGroups"][number];
+export type QuoteItem = LayoutGroup["items"][number];
+export type Component = QuoteItem["components"][number];
+export type Edge = Component["edges"][number];
+export type HardwareItem = QuoteItem["hardwareItems"][number];
+export type ProjectFinish = PortalProject["projectFinishes"][number];
 
-type PortalProject = RouterOutputs["portal"]["getByToken"];
+// Helper para crear arrays
+export type QuoteItemsArray = QuoteItem[];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,10 +54,11 @@ export function PortalClient({
   const { data: project = initialProject } = api.portal.getByToken.useQuery(
     { token },
     { initialData: initialProject, refetchInterval: false }
+    
   );
-
+type QuoteItem = PortalProject["layoutGroups"][number]["items"][number];
+  const allItems: QuoteItemsArray = project.layoutGroups.flatMap(g => g.items);
   const statusInfo = STATUS_INFO[project.status] ?? STATUS_INFO.SENT;
-  const allItems   = project.layoutGroups.flatMap(g => g.items);
 
   return (
     <div style={{ fontFamily: "'Georgia', 'Times New Roman', serif", minHeight: "100vh", background: "#faf8f5", color: "#1a1a18" }}>
@@ -185,7 +194,7 @@ export function PortalClient({
 
 function OverviewSection({ project, allItems }: {
   project: PortalProject;
-  allItems: PortalProject["layoutGroups"][number]["items"];
+  allItems:  QuoteItemsArray; 
 }) {
   const byGroup = project.layoutGroups.filter(g => g.items.length > 0);
 
@@ -267,30 +276,37 @@ function OverviewSection({ project, allItems }: {
 
 // ─── 3D Viewer section ────────────────────────────────────────────────────────
 
-function ViewerSection({ project,allItems }: { project: PortalProject,allItems:any}) {
+function ViewerSection({ project,allItems }: { project: PortalProject,allItems:QuoteItemsArray}) {
   // Adapt portal project shape to what KitchenViewer expects
   // KitchenViewer needs the full project from quotes.getProject
   // Portal project has the same structure, just fewer fields exposed
   const adaptedProject = {
     ...project,
-    // Fields KitchenViewer needs that portal omits — safe defaults
     shareToken: "",
     shareExpiry: null,
     referenceImageUrl: null,
     notes: null,
-    tax: project.total, // approximation
+    tax: project.total,
     createdAt: new Date(),
     updatedAt: new Date(),
     status: project.status,
     userId: "",
     clientId: "",
-    client: { id: "", name: project.clientName, email: null, phone: null, address: null, userId: "", createdAt: new Date() },
-  } as any;
-
+    client: { 
+      id: "", 
+      name: project.clientName, 
+      email: "", 
+      phone: "", 
+      address: "", 
+      userId: "", 
+      createdAt: new Date() 
+    },
+  } as never
+const { data: catalog } = api.catalog.getFullCatalog.useQuery();
   return (
     <div style={{ height: "calc(100vh - 120px)", background: "#0e0e12" }}>
       {/* Provide a minimal context for KitchenViewer */}
-      <QuoteBuilderProvider projectId={project.id} initialProject={adaptedProject} initialCatalog={allItems}>
+      <QuoteBuilderProvider projectId={project.id} initialProject={adaptedProject} initialCatalog={catalog}>
         <KitchenViewer project={adaptedProject} className="h-full w-full" />
       </QuoteBuilderProvider>
 
@@ -310,7 +326,7 @@ function ViewerSection({ project,allItems }: { project: PortalProject,allItems:a
 
 function DetailsSection({ project, allItems }: {
   project: PortalProject;
-  allItems: PortalProject["layoutGroups"][number]["items"];
+  allItems:  QuoteItemsArray;
 }) {
   const [openItem, setOpenItem] = useState<string | null>(null);
 
@@ -458,9 +474,12 @@ function CustomizeSection({ project, token, onSubmitted }: {
     onSuccess: onSubmitted,
   });
 
-  const allComponents = project.layoutGroups
+  const allComponents: Component[] = project.layoutGroups
     .flatMap(g => g.items)
-    .flatMap(i => i.components.map(c => ({ ...c, itemLabel: i.label ?? i.elementType.name })));
+    .flatMap(i => i.components.map(c => ({ 
+      ...c, 
+      itemLabel: i.label ?? i.elementType.name 
+    })));
 
   const handleSubmit = () => {
     if (!action) return;
@@ -503,7 +522,7 @@ function CustomizeSection({ project, token, onSubmitted }: {
 
             <div style={{ flex: 1 }}>
               <p style={{ fontFamily: "system-ui", fontSize: 13, fontWeight: 500, color: "#1a1a18", marginBottom: 2 }}>
-                {comp.itemLabel} — {comp.componentType.replace(/_/g, " ")}
+                {comp.label} — {comp.componentType.replace(/_/g, " ")}
               </p>
               <p style={{ fontFamily: "system-ui", fontSize: 12, color: "#aaa", marginBottom: 8 }}>
                 {comp.material?.name ?? "Sin material"} {comp.surfaceFinish ? `· ${comp.surfaceFinish.name}` : ""}

@@ -9,6 +9,24 @@ import type { RouterOutputs } from "@/trpc/react";
 
 type Project  = RouterOutputs["quotes"]["getProject"];
 type Catalog  = RouterOutputs["catalog"]["getFullCatalog"];
+interface ProjectAdapted extends Project {
+  shareToken: string,
+    referenceImageUrl: string|null,
+    notes: string|null,
+    createdAt:  Date,
+    updatedAt: Date,
+    userId: string,
+    clientId: string,
+    client: { 
+      id: string, 
+      name: string, 
+      email: string, 
+      phone: string, 
+      address: string, 
+      userId: string, 
+      createdAt: Date 
+    },
+}
 
 type Selection =
   | { type: "item";      quoteItemId: string }
@@ -44,8 +62,8 @@ export function QuoteBuilderProvider({
 }: {
   children:        ReactNode;
   projectId:       string;
-  initialProject:  Project;
-  initialCatalog:  Catalog | null;
+  initialProject:  ProjectAdapted;
+  initialCatalog:  Catalog | undefined;
 }) {
   const utils = api.useUtils();
 
