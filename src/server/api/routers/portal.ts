@@ -18,7 +18,7 @@ getByToken: publicProcedure
             items: {
               orderBy: { groupOrder: "asc" },
               include: {
-                elementType: { select: { name: true, threeJsModel: true, category:true } },
+                elementType: { select: { name: true, category:true } },
                 components: {
                   include: {
                     material: { 
