@@ -474,8 +474,8 @@ function CustomizeSection({ project, token, onSubmitted }: {
   });
 
   const allComponents: Component[] = project.layoutGroups
-    .flatMap(g => g.items)
-    .flatMap(i => i.components.map(c => ({ 
+    .flatMap((g:LayoutGroup) => g.items)
+    .flatMap((i:QuoteItem) => i.components.map((c:Component) => ({ 
       ...c, 
       itemLabel: i.label ?? i.elementType.name 
     })));
