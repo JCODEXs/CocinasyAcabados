@@ -196,8 +196,7 @@ function OverviewSection({ project, allItems }: {
   project: PortalProject;
   allItems:  QuoteItemsArray; 
 }) {
-  const byGroup = project.layoutGroups.filter(g => g.items.length > 0);
-
+  const byGroup = project.layoutGroups.filter((g:LayoutGroup) => g.items.length > 0);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
       {/* Left: groups */}
