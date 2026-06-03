@@ -438,7 +438,7 @@ function DetailsSection({ project, allItems }: {
       <div style={{ marginTop: 32, borderTop: "1px solid rgba(0,0,0,0.1)", paddingTop: 24 }}>
         {[
           { label: "Subtotal muebles y materiales", value: Number(project.subtotal) },
-          { label: "Acabados de obra", value: project.projectFinishes.reduce((s, f) => s + Number(f.totalPrice), 0) },
+          { label: "Acabados de obra", value: project.projectFinishes.reduce((s:number, f:ProjectFinish) => s + Number(f.totalPrice), 0) },
         ].map(row => (
           <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontFamily: "system-ui", fontSize: 14, color: "#666" }}>
             <span>{row.label}</span>
