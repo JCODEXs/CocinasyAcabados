@@ -391,7 +391,7 @@ function DetailsSection({ project, allItems }: {
                           }} />
                           <div style={{ flex: 1 }}>
                             <p style={{ fontFamily: "system-ui", fontSize: 13, color: "#333" }}>
-                              {comp.componentType.replace(/_/g, " ").toLowerCase().replace(/^\w/, c => c.toUpperCase())}
+                              {comp.componentType.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c:string) => c.toUpperCase())}
                               {comp.label && <span style={{ color: "#aaa", marginLeft: 6 }}>— {comp.label}</span>}
                             </p>
                             <p style={{ fontFamily: "system-ui", fontSize: 11, color: "#aaa" }}>
