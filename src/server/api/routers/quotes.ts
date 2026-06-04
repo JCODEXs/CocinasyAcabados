@@ -49,7 +49,7 @@ const addQuoteItemSchema = z.object({
   zocalo:        z.number().positive(),
   assemblyType:  z.string().optional(),
   quantity:      z.number().int().positive().default(1),
-  layoutGroupId: z.string().optional(),
+  layoutGroupId: z.string(),
   groupOrder:    z.number().int().default(0),
 });
 
