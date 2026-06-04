@@ -42,14 +42,14 @@ async function recalculateGroupPositions(
     curX += Math.cos(rad) * item.gapBeforeCm;
     curZ += Math.sin(rad) * item.gapBeforeCm;
 
+
+    // Avanzar cursor por el ancho del item en la dirección actual
+    curX += Math.cos(rad) * item.width -Math.sin(rad) * item.width;
+    curZ +=0;
+
     const posX = parseFloat(curX.toFixed(4));
     const posZ = parseFloat(curZ.toFixed(4));
     const rotationY = angleDeg;
-
-    // Avanzar cursor por el ancho del item en la dirección actual
-    curX += Math.cos(rad) * item.width;
-    curZ += Math.sin(rad) * item.width;
-
     // Aplicar giro para el siguiente item
     const delta = CORNER_DELTAS[item.connectionToNext as string];
     if (delta !== undefined) angleDeg += delta;

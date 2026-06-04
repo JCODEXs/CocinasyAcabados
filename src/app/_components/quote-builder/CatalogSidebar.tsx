@@ -140,7 +140,6 @@ function ElementTypeCard({ elementType, projectId, selectedGroupId, onAdded }: {
     onError:   () => { setAdding(false); },
   });
 
-
   const handleAdd = () => {
     if (!selectedGroupId) return;
     

@@ -153,14 +153,19 @@ export class KitchenScene {
     const L    = roomL / 100;
     const H    = roomH / 100;
     const WALL = 0.1;
+    
 
     const floorMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee , roughness: 0.9, metalness: 0.04 });
     const wallMat  = new THREE.MeshStandardMaterial({ color: 0xf5f0ea, roughness: 1,   metalness: 0 });
 
     const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, L), floorMat);
+    const center = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), wallMat);
     floor.position.set(W / 2, -0.01, L / 2);
-    floor.receiveShadow = true;
+    // center.position.set( WALL / 2, 2, WALL / 2);
+    
+    // floor.receiveShadow = true;
     this.roomGroup.add(floor);
+    // this.roomGroup.add(center);
 
     // const wallBack = new THREE.Mesh(new THREE.BoxGeometry(W + WALL * 2, H, WALL), wallMat);
     // wallBack.position.set(W / 2, H / 2, -WALL / 2);
@@ -219,12 +224,20 @@ export class KitchenScene {
       // Instancia principal (index 0)
       results.push({
         item,
-        posX: item.posX / 100 +Math.sin(rotY)*item.width/200-Math.sin(rotY)*item.depth/200 -(item.rotationY===-90?item.depth/200:0)-(item.rotationY===-180?item.width/100:0)-(item.rotationY===180?(item.width/100)+0.15:0),
+        posX: Math.cos(rotY)*(item.posX-item.width/2)/100 +Math.sin(rotY)*(item.width/2-item.posZ)/100,
         posY: 0 ,
-        posZ: item.posZ / 100-Math.sin(rotY)*item.depth/200-Math.sin(rotY)*item.width/200+(item.rotationY===180?(item.depth/100):0)-(item.rotationY===-180?item.depth/100:0),
+        posZ: Math.cos(rotY)*(item.depth+item.posZ) /100 +Math.sin(rotY)*(item.posX-item.width/2)/100,
         rotY,
         instanceIndex: 0,
       });
+      // results.push({
+      //   item,
+      //   posX: item.posX / 100 +Math.sin(rotY)*item.width/200-Math.sin(rotY)*item.depth/200 -(item.rotationY===-90?item.depth/200:0)-(item.rotationY===-180?item.width/100:0)-(item.rotationY===180?(item.width/100)+0.15:0),
+      //   posY: 0 ,
+      //   posZ: item.posZ / 100-Math.sin(rotY)*item.depth/200-Math.sin(rotY)*item.width/200+(item.rotationY===180?(item.depth/100):0)-(item.rotationY===-180?item.depth/100:0),
+      //   rotY,
+      //   instanceIndex: 0,
+      // });
 
       // Instancias extra para quantity > 1
       // Se desplazan a lo largo de la dirección de rotación del item
@@ -245,6 +258,7 @@ export class KitchenScene {
         });
       }
     }
+    console.log(results,"results")
     return results;
   }
 
@@ -355,8 +369,8 @@ private buildParametricParams(item: QuoteItem): ParametricObjectParams2 {
 const obj = new DynamicParametricObject(params);
         if (!obj) continue;
 
-        obj.position.set(posX, posY, posZ);
         obj.rotation.y = rotY;
+        obj.position.set(posX, posY, posZ);
         // DynamicParametricObject handles materials individually from component templates
         // Do not apply global material config to avoid overriding component-specific colors
         this.itemsGroup.add(obj);

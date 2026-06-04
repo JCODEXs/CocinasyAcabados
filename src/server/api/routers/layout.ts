@@ -103,10 +103,10 @@ console.log(endpoint,"endpoint")
       });
       if (group.project.userId !== ctx.session.user.id) throw new TRPCError({ code: "FORBIDDEN" });
       // Desasociar items del grupo antes de borrar
-      await db.quoteItem.updateMany({
-        where: { layoutGroupId: input.id },
-        data: { layoutGroupId: null, groupOrder: 0, connectionToNext: "END" },
-      });
+      // await db.quoteItem.updateMany({
+      //   where: { layoutGroupId: input.id },
+      //   data: { layoutGroupId: null, groupOrder: 0, connectionToNext: "END" },
+      // });
       return db.layoutGroup.delete({ where: { id: input.id } });
     }),
 

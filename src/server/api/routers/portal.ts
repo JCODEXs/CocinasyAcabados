@@ -104,10 +104,10 @@ getByToken: publicProcedure
     .input(z.object({
       token: z.string(),
       preferences: z.array(z.object({
-        componentId: z.string().cuid(),
-        materialId: z.string().cuid().optional(),
-        surfaceFinishId: z.string().cuid().optional(),
-        hardwareIds: z.array(z.string().cuid()).optional(),
+        componentId: z.string(),
+        materialId: z.string().optional(),
+        surfaceFinishId: z.string().optional(),
+        hardwareIds: z.array(z.string()).optional(),
         notes: z.string().optional(),
       })),
       clientNotes: z.string().optional(),

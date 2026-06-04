@@ -20,10 +20,11 @@ export function HardwareSelector({ quoteItemId, hardwareItems }: {
   quoteItemId: string;
   hardwareItems: HardwareItem[];
 }) {
-  const { invalidateProject } = useQuoteBuilder();
+  const { invalidateProject,project } = useQuoteBuilder();
   const [adding, setAdding] = useState(false);
   const [selectedHardwareId, setSelectedHardwareId] = useState("");
   const [qty, setQty] = useState(1);
+
 
   const { data: catalog } = api.catalog.getFullCatalog.useQuery(undefined, { staleTime: 10 * 60 * 1000,
   gcTime:    30 * 60 * 1000, });

@@ -62,10 +62,10 @@ export function QuoteBuilderShell() {
   ];
 
   return (
-    <div className="flex relative  h-dvh flex-col bg-gray-50 dark:bg-gray-950">
+    <div className="flex absolute h-full flex-col bg-gray-50 dark:bg-gray-950 w-full">
 
       {/* ── Topbar ───────────────────────────────────────────────────────── */}
-      <header className="flex  sticky h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+      <header className="flex absolute sticky h-12 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {project.name}
@@ -76,7 +76,7 @@ export function QuoteBuilderShell() {
           <StatusBadge status={project.status} />
         </div>
 
-     {   viewMode === "3d" && <div className="flex items-center gap-2 absolute sticky">
+     {   true && <div className="flex items-center gap-2">
           {/* View mode toggle */}
           <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
             {VIEW_BUTTONS.map(({ mode, icon, label }) => (
@@ -106,42 +106,23 @@ export function QuoteBuilderShell() {
 
       {/* ── Vista 3D — ocupa toda la pantalla sin sidebars ───────────────── */}
       {viewMode === "3d" && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 relative min-h-0 w-full">
           <KitchenViewer project={project} className="h-full w-full" />
         </div>
       )}
 
       {/* ── Vista split o floorplan — layout de columnas ─────────────────── */}
       {viewMode !== "3d" && (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0">
 
           {/* Col 1: Catálogo — lee del contexto, no necesita props */}
           <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             
-    
-          <div className=" mt-5">
-            <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
-              {VIEW_BUTTONS.map(({ mode, icon, label }) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors ${
-                    viewMode === mode
-                      ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                      : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {icon}
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
             <CatalogSidebar />
           </aside>
 
           {/* Col 2: Canvas principal */}
-          <main className="flex flex-1 flex-col overflow-hidden">
+          <main className="flex flex-1 flex-col min-h-0">
             <LayoutCanvas />
           </main>
 

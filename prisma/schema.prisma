@@ -515,8 +515,8 @@ model QuoteItem {
   label String? // "Mueble bajo esquina", "Refrigerador"
 
   // ── Grupo de layout ──────────────────────
-  layoutGroupId String?
-  layoutGroup   LayoutGroup? @relation(fields: [layoutGroupId], references: [id])
+  layoutGroupId String
+  layoutGroup   LayoutGroup @relation(fields: [layoutGroupId], references: [id], onDelete: Cascade)
 
   // Posición dentro del grupo (ordenable por drag)
   groupOrder Int @default(0)

@@ -38,6 +38,7 @@ const addQuoteItemSchema = z.object({
   depth:         z.number().positive(),
   thicknessMM:    z.number().positive(),
   backThicknessMM:z.number().positive(),
+  // posX:           z.number().optional(),
   // componentTemplateId: z.string(),
   // widthFormula: z.string().min(1),
   // heightFormula: z.string().min(1),

@@ -199,8 +199,8 @@ export function QuoteItemCard({ item }: { item: QuoteItem }) {
               </div>
             )}
 
-            {activeTab === "hardware" && (
-              <HardwareSelector quoteItemId={item.id} hardwareItems={item.hardwareItems} />
+            {activeTab === "hardware" && ItemOptimista && (
+              <HardwareSelector quoteItemId={item.id} hardwareItems={ItemOptimista.hardwareItems} />
             )}
 
             {activeTab === "supplies" && (
