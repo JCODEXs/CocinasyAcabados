@@ -148,7 +148,7 @@ console.log(endpoint,"endpoint")
   moveItemToGroup: protectedProcedure
     .input(z.object({
       itemId: z.string().cuid(),
-      targetGroupId: z.string().cuid().nullable(),
+      targetGroupId: z.string(),
       groupOrder: z.number().int().default(0),
     }))
     .mutation(async ({ ctx, input }) => {
