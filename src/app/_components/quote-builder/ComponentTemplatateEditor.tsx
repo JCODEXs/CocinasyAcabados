@@ -366,7 +366,7 @@ function Preview3D({
   highlightIdx: number | null;
   thicknessMM:  number;
 }) {
-  const T   =  thicknessMM?thicknessMM / 10 : 1.8;
+  const T   =  thicknessMM?thicknessMM : 1.8;
   const ctx = makeEvalContext(W, H, D, T);
 
   const Wm = W / 100;
@@ -452,19 +452,21 @@ function Preview3D({
 function SkeletonGeneratorModal({
   onGenerate,
   onClose,
+  elementType
 }: {
   onGenerate: (rows: TemplateRow[]) => void;
   onClose:    () => void;
+  elementType:ElementType;
 }) {
   const [cfg, setCfg] = useState<SkeletonConfig>({
     style:           "BASE_CABINET",
     assembly:        "LATERAL_PASANTE",
-    zocalo:          7,
+    zocalo:          elementType.zocalo,
     hasCeiling:      false,
     hasBack:         true,
     hasBase:         true,
-    thicknessMM:     18,
-    backThicknessMM: 9,
+    thicknessMM:    elementType.thicknessMM,
+    backThicknessMM: elementType.backThicknessMM,
   });
 
   const preview = useMemo(() => generateSkeleton(cfg), [cfg]);
@@ -476,7 +478,7 @@ function SkeletonGeneratorModal({
     { id: "DRAWER_UNIT",   icon: "≡", label: "Cajonera",         desc: "Para frentes de cajón" },
   ];
 
-  const W = 80, H = 72, D = 60; // dimensiones de preview
+  const W = elementType.defaultWidth, H = elementType.defaultHeight, D = elementType.defaultDepth ,T=elementType.thicknessMM // dimensiones de preview
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -610,7 +612,7 @@ function SkeletonGeneratorModal({
 
           {/* Right: preview */}
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-            <Preview3D rows={preview} W={W} H={H} D={D} highlightIdx={null} thicknessMM={2} />
+            <Preview3D rows={preview} W={W??80} H={H??70} D={D??40} highlightIdx={null} thicknessMM={T??20} />
 
             <div>
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gray-400">
@@ -745,6 +747,26 @@ export function ComponentTemplatesEditor({
     setRows(prev => prev.filter((_, i) => i !== idx).map((r, i) => ({ ...r, sortOrder: i })));
     setDirty(true);
   };
+  const duplicateRow = (idx: number) => {
+  setRows(prev => {
+    const rowToDuplicate = prev[idx];
+    if (!rowToDuplicate) return prev;
+    const newRow = { 
+      ...rowToDuplicate, 
+      id: undefined, // Clear ID if needed
+      sortOrder: prev.length // Add at the end or idx + 1
+    };
+    
+    // Option A: Insert after the duplicated row
+    const newRows = [...prev];
+    newRows.splice(idx + 1, 0, newRow);
+    return newRows.map((r, i) => ({ ...r, sortOrder: i }));
+    
+    // Option B: Add to the end
+    // return [...prev, { ...newRow, sortOrder: prev.length }];
+  });
+  setDirty(true);
+};
 
   const addFromTemplate = (tmpl: QuickTemplate) => {
     setRows(prev => {
@@ -760,7 +782,7 @@ export function ComponentTemplatesEditor({
     setDirty(true);
   };
 
-  const T = thicknessMM ? thicknessMM / 10 : 1.8;
+  const T = thicknessMM ? thicknessMM : 1.8;
   const ctx = makeEvalContext(previewW, previewH, previewD, T);
 
   // Evaluar y mostrar el valor actual de una fórmula
@@ -864,12 +886,19 @@ export function ComponentTemplatesEditor({
                   >
                     {/* Orden */}
                     <td className="px-1 py-1">
-                      <div className="flex flex-col gap-0.5">
+                      {/* <div className="flex flex-col gap-0.5">
                         <button onClick={() => moveRow(idx, -1)} disabled={idx === 0}
                           className="text-gray-600 hover:text-gray-300 disabled:opacity-20 leading-none">▲</button>
                         <button onClick={() => moveRow(idx, 1)} disabled={idx === rows.length - 1}
                           className="text-gray-600 hover:text-gray-300 disabled:opacity-20 leading-none">▼</button>
-                      </div>
+                      </div> */}
+                         <button 
+                        onClick={() => duplicateRow(idx)}
+                        className="rounded p-1 text-gray-600 hover:bg-blue-900/30 hover:text-blue-400"
+                         title="Duplicate row"
+                          >
+                          📑
+                         </button>
                     </td>
 
                     {/* Tipo */}
@@ -1057,6 +1086,7 @@ export function ComponentTemplatesEditor({
         <SkeletonGeneratorModal
           onGenerate={handleGenerate}
           onClose={() => setShowSkeleton(false)}
+          elementType={elementType}
         />
       )}
     </div>
