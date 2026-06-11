@@ -15,8 +15,10 @@ import type {ElementType, MaterialCategory,SurfaceFinishType} from "@prisma/clie
 
 const COMPONENT_TYPES = [
   "LATERAL", "FONDO", "TECHO", "PISO", "ENTREPAÑO",
-  "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL",
+  "PUERTA", "FRENTE_CAJON", "CAJA_CAJON", "MESON", "ZOCALO", "DIVISION", "RIEL","ESQUINERO"
 ] as const;
+const corners=["top-right" , "top-left" , "bottom-right" , "bottom-left"]
+type CornersType = typeof corners[number]
 
 type ComponentTypeStr = typeof COMPONENT_TYPES[number];
 
@@ -32,6 +34,9 @@ interface TemplateRow {
   posXFormula:             string;
   posYFormula:             string;
   posZFormula:             string;
+  CutX:                    number;
+  CutY:                    number;
+  cornerToCut?:            CornersType;
 //   thicknessMM:             number;
 // Rotations agregar a setTemplate y a row
 //   rotXFormula:             string;
@@ -54,12 +59,17 @@ interface TemplateRow {
 // IH = alto interno   = H - T*2
 // ID = fondo interno  = D - T_FONDO (por defecto T = misma T)
 
-function makeEvalContext(W: number, H: number, D: number, T = 1.8) {
+function makeEvalContext(W: number, H: number, D: number, T = 1.8,CutX=35,CutY=35,zocalo=7) {
   const IW = W - T * 2;
-  const IH = H - T * 2;
   const ID = D - T;
-  const ZO = 7;
-  return { W, H, D, T, IW, IH, ID,ZO };
+  const ZO = zocalo;
+  const CX= CutX;
+  const IH = H - T * 2-ZO;
+  const CY=CutY;
+  const TotW=W+CX
+  const TotD=D+CY
+
+  return { W, H, D, T, IW, IH, ID,ZO,CX,CY,TotW,TotD };
 }
 
 function evalFormula(formula: string, ctx: Record<string, number>): number {
@@ -98,7 +108,7 @@ const COMPONENT_LABELS: Record<string, string> = {
   LATERAL: "Lateral", FONDO: "Fondo", TECHO: "Techo", PISO: "Piso",
   ENTREPAÑO: "Entrepaño", PUERTA: "Puerta", FRENTE_CAJON: "Frente cajón",
   CAJA_CAJON: "Caja cajón", MESON: "Mesón", ZOCALO: "Zócalo",
-  DIVISION: "División", RIEL: "Riel",
+  DIVISION: "División", RIEL: "Riel", ESQUINERO:"Esquinero"
 };
 
 const MATERIAL_CATEGORIES = [
@@ -114,7 +124,7 @@ const SURFACE_FINISH_TYPES = [
 // ─── Generadores de casco ─────────────────────────────────────────────────────
 
 interface SkeletonConfig {
-  style:         "BASE_CABINET" | "WALL_CABINET" | "ISLAND" | "DRAWER_UNIT";
+  style:         "BASE_CABINET" | "WALL_CABINET" | "ISLAND" | "DRAWER_UNIT"|"ESQUINERO";
   assembly:      "LATERAL_PASANTE" | "PISO_PASANTE";
   zocalo:        number;
   hasCeiling:    boolean;
@@ -122,6 +132,9 @@ interface SkeletonConfig {
   hasBase:       boolean;
   thicknessMM:   number;
   backThicknessMM: number;
+  CutX:            number;
+  CutY:            number;
+  cornerToCut?:   CornersType;
 }
 type SkeletonConfigValue = 
   | "BASE_CABINET" | "WALL_CABINET" | "ISLAND" | "DRAWER_UNIT"  // for style
@@ -134,125 +147,24 @@ type SkeletonConfigValue =
 }
 
 function generateSkeleton(cfg: SkeletonConfig): TemplateRow[] {
-  const T     = cfg.thicknessMM / 10;    // cm
-  const TF    = cfg.backThicknessMM / 10; // cm (espesor fondo)
-  const Z     = cfg.zocalo;              // cm
 
-  // Fórmulas que varían según el tipo de ensamble
-  const isLP = cfg.assembly === "LATERAL_PASANTE";
+   switch (cfg.style) {
+    case "BASE_CABINET":
+      return generateBaseCabinetSkeleton(cfg);
+    case "WALL_CABINET":
+      return generateWallCabinetSkeleton(cfg);
+    case "ISLAND":
+      return generateIslandSkeleton(cfg);
+    case "DRAWER_UNIT":
+      return generateDrawerUnitSkeleton(cfg);
+    case "ESQUINERO":
+      return generateEsquineroSkeleton(cfg);
+    default:
+      return generateBaseCabinetSkeleton(cfg);
 
-  // En "lateral pasante": laterales van de suelo a techo, piso/techo encajan entre ellos
-  // En "piso pasante":    piso y techo van de lado a lado, laterales encajan entre ellos
-
-  const latH  = isLP ? `H - ${Z}`  : `H - ${Z} - T`;
-  const latPY = isLP ? `(H - ${Z}) / 2 + ${Z}` : `(H - ${Z} - T) / 2 + ${Z} + T/2`;
-
-  const sueloPanH = `T`;
-  const techoW    = isLP ? `W - T * 2` : `W`;
-  const pisoW     = isLP ? `W - T * 2` : `W`;
-  const sueloPY   = `${Z} + T / 2`;
-
-  const rows: TemplateRow[] = [];
-  let sort = 0;
-
-  const base = (overrides: Partial<TemplateRow>): TemplateRow => ({
-    componentType:           "LATERAL",
-    label:                   "",
-    widthFormula:            "T",
-    heightFormula:           "H",
-    depthFormula:            "D",
-    posXFormula:             "0",
-    posYFormula:             "H / 2",
-    posZFormula:             "0",
-    // thicknessMM:             cfg.thicknessMM,
-    quantity:                1,
-    sortOrder:               sort++,
-    topEdge:                 false,
-    bottomEdge:              false,
-    leftEdge:                true,
-    rightEdge:               false,
-    defaultMaterialCategory: "MELAMINA",
-    defaultSurfaceFinishType:"MELAMINA",
-    ...overrides,
-  });
-
-  // ── Laterales ────────────────────────────────────────────────────────────
-  rows.push(base({
-    componentType: "LATERAL", label: "Lateral Izq",
-    widthFormula:  "T",
-    heightFormula: latH,
-    depthFormula:  "D",
-    posXFormula:   "-W / 2 + T / 2",
-    posYFormula:   latPY,
-    posZFormula:   "0",
-    leftEdge: true, rightEdge: false,
-  }));
-
-  rows.push(base({
-    componentType: "LATERAL", label: "Lateral Der",
-    widthFormula:  "T",
-    heightFormula: latH,
-    depthFormula:  "D",
-    posXFormula:   "W / 2 - T / 2",
-    posYFormula:   latPY,
-    posZFormula:   "0",
-    leftEdge: false, rightEdge: true,
-    sortOrder:     sort++,
-  }));
-
-  // ── Piso ─────────────────────────────────────────────────────────────────
-  if (cfg.hasBase) rows.push(base({
-    componentType: "PISO", label: "Piso",
-    widthFormula:  pisoW,
-    heightFormula: sueloPanH,
-    depthFormula:  `D - ${TF}`,
-    posXFormula:   "0",
-    posYFormula:   sueloPY,
-    posZFormula:   `${TF} / 2`,
-    topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false,
-    sortOrder: sort++,
-  }));
-
-  // ── Techo ─────────────────────────────────────────────────────────────────
-  if (cfg.hasCeiling) rows.push(base({
-    componentType: "TECHO", label: "Techo",
-    widthFormula:  techoW,
-    heightFormula: "T",
-    depthFormula:  `D - ${TF}`,
-    posXFormula:   "0",
-    posYFormula:   `H - T / 2`,
-    posZFormula:   `${TF} / 2`,
-    topEdge: true, bottomEdge: false,
-    sortOrder: sort++,
-  }));
-
-  // ── Fondo ─────────────────────────────────────────────────────────────────
-  if (cfg.hasBack) rows.push(base({
-    componentType:   "FONDO", label: "Fondo",
-    widthFormula:    `W - T * 2`,
-    heightFormula:   `H - ${Z} - T`,
-    depthFormula:    `${TF}`,
-    posXFormula:     "0",
-    posYFormula:     `(H - ${Z} - T) / 2 + ${Z} + T / 2`,
-    posZFormula:     `-D / 2 + ${TF} / 2`,
-    // thicknessMM:     cfg.backThicknessMM,
-    sortOrder: sort++,
-  }));
-
-  // ── Zócalo ────────────────────────────────────────────────────────────────
-  if (Z > 0) rows.push(base({
-    componentType: "ZOCALO", label: "Zócalo",
-    widthFormula:  `W - T * 2`,
-    heightFormula: `${Z}`,
-    depthFormula:  "T",
-    posXFormula:   "0",
-    posYFormula:   `${Z} / 2`,
-    posZFormula:   `D / 2 - T / 2-5`,
-    sortOrder: sort++,
-  }));
-
-  return rows;
-}
+ 
+   }
+  }
 
 // ─── Plantillas rápidas ───────────────────────────────────────────────────────
 
@@ -276,7 +188,7 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     label: "División vertical", icon: "▮", description: "Divisor interno de ancho T",
     row: () => ({
       componentType: "DIVISION", label: "División",
-      widthFormula: "T", heightFormula: "IH-ZO-2*T", depthFormula: "ID",
+      widthFormula: "T", heightFormula: "IH-ZO", depthFormula: "ID",
       posXFormula: "0", posYFormula: "(H+ZO-2*T) / 2", posZFormula: "T / 2",
     }),
   },
@@ -286,6 +198,16 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
       componentType: "PUERTA", label: "Puerta",
       widthFormula: "(W - 0.4)/2", heightFormula: "H-ZO- 4", depthFormula: "T",
       posXFormula: "-(W - 0.4)/4", posYFormula: "(H +ZO)/ 2", posZFormula: "D / 2 + T / 2",
+      topEdge: true, bottomEdge: true, leftEdge: true, rightEdge: true,
+      defaultSurfaceFinishType: "LACADO",
+    }),
+  },
+  {
+    label: "Puerta Equinera", icon: "▭", description: "Frente de puerta con descuento de dilatación",
+    row: () => ({
+      componentType: "PUERTA", label: "Puerta",
+      widthFormula: "T", heightFormula: "H-ZO- 4", depthFormula: "CY+T",
+      posXFormula: "(T-W)/2", posYFormula: "(H +ZO)/ 2", posZFormula: "(D+T+CY)/2",
       topEdge: true, bottomEdge: true, leftEdge: true, rightEdge: true,
       defaultSurfaceFinishType: "LACADO",
     }),
@@ -312,14 +234,264 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     label: "Panel en blanco", icon: "+", description: "Panel totalmente personalizable",
     row: () => ({
       componentType: "LATERAL", label: "",
-      widthFormula: "T", heightFormula: "H", depthFormula: "D",
-      posXFormula: "0", posYFormula: "H / 2", posZFormula: "0",
+      widthFormula: "T", heightFormula: "H", depthFormula: "D-T",
+      posXFormula: "W/2", posYFormula: "H / 2", posZFormula: "0",
+    }),
+  },
+  {
+    label: "Panel Esquinero", icon: "+", description: "Panel Recortado",
+    row: () => ({
+      componentType: "ESQUINERO", label: "PISO",
+      widthFormula: "W+CX-2*T", heightFormula: "T", depthFormula: "D+CY",
+      posXFormula: "0", posYFormula: "ZO", posZFormula: "0",CutX:35,CutY:35
+    }),
+  },
+  {
+    label: "Fondo Esquinero", icon: "+", description: "Panel Fondo",
+    row: () => ({
+      componentType: "FONDO", label: "FONDO LARGO ",
+      widthFormula: "W+CX-T", heightFormula: "H", depthFormula: "T",
+      posXFormula: "-CX/2", posYFormula: "H/2", posZFormula: "-(D+T)/2",CutX:35,CutY:35
+    }),
+  },
+  {
+    label: "Frente Esquinero", icon: "+", description: "Panel Frente",
+    row: () => ({
+      componentType: "FONDO", label: "FRENTE CORTO ",
+      widthFormula: "W-T", heightFormula: "H", depthFormula: "T",
+      posXFormula: "T/2", posYFormula: "H/2", posZFormula: "(D-T)/2+CY",CutX:35,CutY:35
+    }),
+  },
+  {
+    label: "Zocalo", icon: "+", description: "zocalo",
+    row: () => ({
+      componentType: "FONDO", label: "FRENTE CORTO ",
+      widthFormula: "W", heightFormula: "ZO", depthFormula: "T",
+      posXFormula: "T/2", posYFormula: "ZO/2", posZFormula: "(D-T)/2+CY",CutX:35,CutY:35
     }),
   },
 ];
 
 // ─── Preview 3D ───────────────────────────────────────────────────────────────
 
+import * as THREE from 'three';
+import { generateBaseCabinetSkeleton, generateDrawerUnitSkeleton, generateEsquineroSkeleton, generateIslandSkeleton, generateWallCabinetSkeleton } from "./CabinetSkeletonTemplates";
+
+// function BoxWithCutout({ w, h, d, cutW, cutH,isHighlighted,color,y,x,z,cornerToCut= "bottom-left" }:
+//   {w:number, h:number, d:number, cutW:number, cutH:number,isHighlighted:boolean,color:string,y:number,x:number,z:number,cornerToCut:string}
+// ) {
+// const shape = useMemo(() => {
+//     const s = new THREE.Shape();
+
+//     switch (cornerToCut) {
+//       case "top-right":
+//       case "top-right-front": // Mapeado a tu variable original
+//         // 1. Origen inferior izquierdo
+//         s.moveTo(0, 0);                 
+//         s.lineTo(w, 0);                 
+//         // Esquina superior derecha cortada en ángulo recto:
+//         s.lineTo(w, d - cutH);          
+//         s.lineTo(w - cutW, d - cutH);   
+//         s.lineTo(w - cutW, d);          
+//         // Cierre
+//         s.lineTo(0, d);                 
+//         s.lineTo(0, 0);
+//         break;
+
+//       case "top-left":
+//       case "top-left-front":
+//         s.moveTo(0, 0);
+//         s.lineTo(w, 0);
+//         s.lineTo(w, d);
+//         // Esquina superior izquierda cortada en ángulo recto:
+//         s.lineTo(cutW, d);
+//         s.lineTo(cutW, d - cutH);
+//         s.lineTo(0, d - cutH);
+//         s.lineTo(0, 0);
+//         break;
+
+//       case "bottom-right":
+//       case "bottom-right-front":
+//         s.moveTo(0, 0);
+//         // Esquina inferior derecda cortada en ángulo recto:
+//         s.lineTo(w - cutW, 0);
+//         s.lineTo(w - cutW, cutH);
+//         s.lineTo(w, cutH);
+//         // Cierre superior e izquierdo
+//         s.lineTo(w, d);
+//         s.lineTo(0, d);
+//         s.lineTo(0, 0);
+//         break;
+
+//       case "bottom-left":
+//       case "bottom-left-front":
+//       default: // Tu requerimiento: Por defecto corta la inferior izquierda
+//         // Esquina inferior izquierda cortada en ángulo recto desde el inicio:
+//         s.moveTo(cutW, 0);
+//         s.lineTo(w, 0);
+//         s.lineTo(w, d);
+//         s.lineTo(0, d);
+//         s.lineTo(0, cutH);
+//         s.lineTo(cutW, cutH);
+//         s.lineTo(cutW, 0);
+//         break;
+//     }
+
+//     return s;
+//   }, [w, d, cutW, cutH, cornerToCut]);
+
+//   const extrudeSettings = {
+//     steps: 1,
+//     depth: h, // Este es el grosor del cubo
+//     bevelEnabled: false,
+//   };
+
+//   return (
+//     <mesh castShadow receiveShadow rotation={[-Math.PI / 2, 0,0]} // Rotación en radianes (-90° en X)
+//     position={[-(w+cutW)/2+x, y, (d+cutH)/2+z]}>
+//       <extrudeGeometry args={[shape, extrudeSettings]} />
+//        <meshStandardMaterial
+//         color={isHighlighted ? "#f5c842" : color}
+//         // transparent
+//         opacity={isHighlighted ? 1 : 0.88}
+//       />
+//       <Edges
+//         threshold={5}
+//         color={isHighlighted ? "#c8a020" : "rgba(0,0,0,0.35)"}
+//       />
+//     </mesh>
+//   );
+// }
+
+
+interface BoxWithCutoutProps {
+  w: number; // Ancho total en el espacio global (X)
+  h: number; // Alto total en el espacio global (Y)
+  d: number; // Profundidad total en el espacio global (Z)
+  cutW: number; // Ancho del bocado
+  cutH: number; // Profundidad/Alto del bocado
+  cornerToCut?: CornersType;
+  color?: string;
+  isHighlighted?: boolean;
+  position: [number, number, number];
+}
+
+export function BoxWithCutout({
+  w, h, d,
+  cutW, cutH,
+  cornerToCut = 'bottom-left',
+  color = '#e2e8f0',
+  isHighlighted,
+  position,
+}: BoxWithCutoutProps) {
+
+  // 1. DETECCIÓN AUTOMÁTICA DE ESPESOR Y EJES
+  const { faceW, faceH, thickness, extrudeAxis } = useMemo(() => {
+    const minDim = Math.min(w, h, d);
+
+    if (minDim === h) {
+      // PANEL HORIZONTAL (Piso, Techo, Repisa)
+      // El espesor es la altura (Y). El plano 2D se compone de X (w) y Z (d).
+      return { faceW: w, faceH: d, thickness: h, extrudeAxis: 'y' as const };
+    } else if (minDim === w) {
+      // PANEL VERTICAL TIPO LATERAL (Su espesor está en X)
+      // El plano 2D se compone de Z (d) y Y (h).
+      return { faceW: d, faceH: h, thickness: w, extrudeAxis: 'x' as const };
+    } else {
+      // PANEL VERTICAL TIPO FONDO (Su espesor está en Z)
+      // El plano 2D se compone de X (w) y Y (h).
+      return { faceW: w, faceH: h, thickness: d, extrudeAxis: 'z' as const };
+    }
+  }, [w, h, d]);
+
+  // 2. CONSTRUCCIÓN DEL SHAPE 2D (Usando las caras reales detectadas)
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+
+    switch (cornerToCut) {
+      case 'top-right':
+        s.moveTo(0, 0);
+        s.lineTo(faceW, 0);
+        s.lineTo(faceW, faceH - cutH);
+        s.lineTo(faceW - cutW, faceH - cutH);
+        s.lineTo(faceW - cutW, faceH);
+        s.lineTo(0, faceH);
+        s.lineTo(0, 0);
+        break;
+      case 'top-left':
+        s.moveTo(0, 0);
+        s.lineTo(faceW, 0);
+        s.lineTo(faceW, faceH);
+        s.lineTo(cutW, faceH);
+        s.lineTo(cutW, faceH - cutH);
+        s.lineTo(0, faceH - cutH);
+        s.lineTo(0, 0);
+        break;
+      case 'bottom-right':
+        s.moveTo(0, 0);
+        s.lineTo(faceW - cutW, 0);
+        s.lineTo(faceW - cutW, cutH);
+        s.lineTo(faceW, cutH);
+        s.lineTo(faceW, faceH);
+        s.lineTo(0, faceH);
+        s.lineTo(0, 0);
+        break;
+      case 'bottom-left':
+      default:
+        s.moveTo(cutW, 0);
+        s.lineTo(faceW, 0);
+        s.lineTo(faceW, faceH);
+        s.lineTo(0, faceH);
+        s.lineTo(0, cutH);
+        s.lineTo(cutW, cutH);
+        s.lineTo(cutW, 0);
+        break;
+    }
+    return s;
+  }, [faceW, faceH, cutW, cutH, cornerToCut]);
+
+  // 3. CONFIGURACIÓN DE EXTRUSIÓN (El depth siempre es el espesor mínimo detectado)
+  const extrudeSettings = useMemo(() => ({
+    steps: 1,
+    depth: thickness,
+    bevelEnabled: false,
+  }), [thickness]);
+
+  // 4. MATRIZ DE ROTACIÓN (Orientar el plano XY local al plano correcto del mundo 3D)
+  const rotation = useMemo(() => {
+    const rot = new THREE.Euler();
+    if (extrudeAxis === 'y') {
+      // Extrusión en Y (Horizontal): Rotamos en X para acostarlo sobre el plano XZ
+      rot.set(-Math.PI / 2, 0, 0);
+    } else if (extrudeAxis === 'x') {
+      // Extrusión en X (Lateral): Rotamos en Y para colocarlo en el plano YZ
+      rot.set(0, Math.PI / 2, 0);
+    } else {
+      // Extrusión en Z (Fondo): Ya nace nativamente en el plano XY, no requiere rotación
+      rot.set(0, 0, 0);
+    }
+    return rot;
+  }, [extrudeAxis]);
+
+  return (
+    <mesh position={position} rotation={rotation}>
+      <extrudeGeometry 
+        attach="geometry" 
+        args={[shape, extrudeSettings]} 
+        // TIP DE RENDIMIENTO Y COORDENADAS: .center() calcula el bounding box 
+        // e iguala el centro de la masa con el pivote del Mesh.
+        onUpdate={(self) => self.center()} 
+      />
+      <meshStandardMaterial
+        color={isHighlighted ? '#f5c842' : color}
+        opacity={isHighlighted ? 1 : 0.95}
+        transparent={isHighlighted}
+      />
+      {/* Edges nos ayuda a delimitar visualmente las uniones de las maderas */}
+      <Edges threshold={5} color={isHighlighted ? '#c8a020' : 'rgba(0,0,0,0.3)'} />
+    </mesh>
+  );
+}
 function PanelMesh({
   row, ctx, isHighlighted,
 }: {
@@ -333,12 +505,24 @@ function PanelMesh({
   const x = evalFormula(row.posXFormula,   ctx) / 100;
   const y = evalFormula(row.posYFormula,   ctx) / 100;
   const z = evalFormula(row.posZFormula,   ctx) / 100;
+  const cutW = row.CutX/100;
+  const cutH = row.CutY/100;
+  
 
   if (w <= 0 || h <= 0 || d <= 0 || isNaN(w) || isNaN(h) || isNaN(d)) return null;
 
   const color = COMPONENT_COLORS[row.componentType] ?? "#e0d8c0";
+  const cut=row.componentType=="ESQUINERO"
+  const cornerToCut=row.cornerToCut??"bottom-left"
+  console.log({w, d, h, cutW, cutH,isHighlighted,color,y,x,z,cornerToCut},"variables")
+ const position: [number, number, number] = [y, x, z];
 
-  return (
+ if(cut){
+  return BoxWithCutout({w, d, h, cutW, cutH,isHighlighted,color,position,cornerToCut})
+ }else{
+
+   
+   return (
     <mesh position={[x, y, z]}>
       <boxGeometry args={[w, h, d]} />
       <meshStandardMaterial
@@ -352,12 +536,13 @@ function PanelMesh({
       />
     </mesh>
   );
+  }
 }
 
 function Preview3D({
   rows, W, H, D,
   highlightIdx,
-  thicknessMM
+  thicknessMM,zocalo
 }: {
   rows:         TemplateRow[];
   W:            number;
@@ -365,9 +550,14 @@ function Preview3D({
   D:            number;
   highlightIdx: number | null;
   thicknessMM:  number;
+  zocalo:number;
 }) {
+  const esquinero=rows.find(d=>d.componentType=="ESQUINERO")
+  const CutX=esquinero?.CutX??0
+  const CutY=esquinero?.CutY??0
+
   const T   =  thicknessMM?thicknessMM : 1.8;
-  const ctx = makeEvalContext(W, H, D, T);
+  const ctx = makeEvalContext(W, H, D, T, CutX, CutY,zocalo);
 
   const Wm = W / 100;
   const Hm = H / 100;
@@ -465,6 +655,9 @@ function SkeletonGeneratorModal({
     hasCeiling:      false,
     hasBack:         true,
     hasBase:         true,
+    CutX:            35,
+    CutY:           35,
+    cornerToCut:    "bottom-left",
     thicknessMM:    elementType.thicknessMM,
     backThicknessMM: elementType.backThicknessMM,
   });
@@ -476,9 +669,10 @@ function SkeletonGeneratorModal({
     { id: "WALL_CABINET",  icon: "▫", label: "Mueble alto",      desc: "Sin zócalo, con techo" },
     { id: "ISLAND",        icon: "◻", label: "Isla / Península", desc: "Acceso por 4 lados" },
     { id: "DRAWER_UNIT",   icon: "≡", label: "Cajonera",         desc: "Para frentes de cajón" },
+    { id: "ESQUINERO",   icon: "^", label: "Esquinero",         desc: "Para acoples en L" },
   ];
-
-  const W = elementType.defaultWidth, H = elementType.defaultHeight, D = elementType.defaultDepth ,T=elementType.thicknessMM // dimensiones de preview
+ const zocalo=elementType.zocalo;
+  const W = elementType.defaultWidth, H = elementType.defaultHeight, D = elementType.defaultDepth ,T=elementType.thicknessMM/10 // dimensiones de preview
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -612,7 +806,7 @@ function SkeletonGeneratorModal({
 
           {/* Right: preview */}
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-            <Preview3D rows={preview} W={W??80} H={H??70} D={D??40} highlightIdx={null} thicknessMM={T??20} />
+            <Preview3D rows={preview} W={W??80} H={H??70} D={D??40} highlightIdx={null} thicknessMM={T??2} zocalo={zocalo} />
 
             <div>
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gray-400">
@@ -676,9 +870,10 @@ function CfgField({ label, value, onChange }: { label: string; value: number; on
 const emptyRow = (sort = 0): TemplateRow => ({
   componentType: "LATERAL", label: "",
   widthFormula: "T", heightFormula: "H", depthFormula: "D",
-  posXFormula: "0", posYFormula: "H / 2", posZFormula: "0", quantity: 1, sortOrder: sort,
+  posXFormula: "0", posYFormula: "H / 2", posZFormula: "0", 
+  CutX:0,CutY:0,quantity: 1, sortOrder: sort,
   topEdge: false, bottomEdge: false, leftEdge: false, rightEdge: false,
-  defaultMaterialCategory: "MELAMINA", defaultSurfaceFinishType: "MELAMINA",
+  defaultMaterialCategory: "MELAMINA", defaultSurfaceFinishType: "MELAMINA"
 });
 
 export function ComponentTemplatesEditor({
@@ -702,6 +897,8 @@ export function ComponentTemplatesEditor({
           posXFormula:   t.posXFormula ?? "0",
           posYFormula:   t.posYFormula ?? "H / 2",
           posZFormula:   t.posZFormula ?? "0",
+          CutX:          t.CutX ?? 20,             
+          CutY:         t.CutY ?? 20,             
         //   thicknessMM:   t.thicknessMM, 
            quantity:        t.quantity,
           sortOrder:     i,
@@ -724,6 +921,12 @@ export function ComponentTemplatesEditor({
   const [showSkeleton,   setShowSkeleton]   = useState(false);
   const [showQuickMenu,  setShowQuickMenu]  = useState(false);
   const [activeFormula,  setActiveFormula]  = useState<{row: number; field: string} | null>(null);
+
+  const zocalo=elementType.zocalo
+  const esquinero=rows.find(d=>d.componentType=="ESQUINERO")
+  const CutX=esquinero?.CutX??0
+  const CutY=esquinero?.CutY??0
+
 
   const save = api.catalog.setComponentTemplates.useMutation({
     onSuccess: () => { setDirty(false); onSaved(); },
@@ -783,7 +986,7 @@ export function ComponentTemplatesEditor({
   };
 
   const T = thicknessMM ? thicknessMM : 1.8;
-  const ctx = makeEvalContext(previewW, previewH, previewD, T);
+  const ctx = makeEvalContext(previewW, previewH, previewD, T, CutX,CutY,zocalo);
 
   // Evaluar y mostrar el valor actual de una fórmula
   const evalPreview = (formula: string): string => {
@@ -805,14 +1008,14 @@ export function ComponentTemplatesEditor({
         <div className="relative">
           <button
             onClick={() => setShowQuickMenu(o => !o)}
-            className="flex items-center gap-1.5 rounded-md border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200"
+            className="flex items-center gap-1.5 rounded-md border border-gray-700 px-3 py-1.5 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200 "
           >
             + Agregar panel ▾
           </button>
           {showQuickMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowQuickMenu(false)} />
-              <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-gray-700 bg-gray-900 py-1 shadow-xl">
+              <div className="absolute left-0 top-full z-20 mt-1 w-64 max-h-90 overflow-y-auto rounded-lg border border-gray-700 bg-gray-900 py-1 shadow-xl ">
                 {QUICK_TEMPLATES.map(tmpl => (
                   <button
                     key={tmpl.label}
@@ -866,8 +1069,8 @@ export function ComponentTemplatesEditor({
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-800">
-                  {["#", "Tipo", "Etiqueta", "Ancho", "Alto", "Fondo", "X", "Y", "Z",
-                     "Q", "Cantos", "Mat.", "Acab.", ""].map(h => (
+                  {["#", "Tipo", "Etiqueta", "Ancho", "Alto", "Fondo", "X", "Y", "Z","CutX","CutY",
+                     "Esquina", "Cantos", "Mat.", "Acab.", ""].map(h => (
                     <th key={h} className="whitespace-nowrap px-2 py-1.5 text-left font-normal text-gray-500">
                       {h}
                     </th>
@@ -970,6 +1173,18 @@ export function ComponentTemplatesEditor({
                         </div>
                       </td>
                     ))}
+                       {(["CutX",  "CutY"] as const).map(field => (
+                      <td key={field} className="px-1 py-1">
+                        <div className="group relative">
+                          <input
+                            value={row[field]}
+                            onChange={e => update(idx, { [field]: +e.target.value })}
+                            className={`w-20 rounded border bg-gray-900 px-1.5 py-0.5 font-mono text-xsborder-gray-700 text-gray-200 focus:border-amber-500}`}
+                          />
+                       
+                        </div>
+                      </td>
+                    ))}
 
                     {/* Espesor */}
                     {/* <td className="px-1 py-1">
@@ -979,15 +1194,37 @@ export function ComponentTemplatesEditor({
                         className="w-12 rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-xs text-gray-200 focus:outline-none"
                       />
                     </td> */}
-
+                  {/* Corner */}
+                  <td className="px-1 py-1">
+                  <div className="grid grid-cols-2 gap-1 text-[10px]">
+                   {[
+                     { value: "top-left", label: "↖", title: "Top-left" },
+                     { value: "top-right", label: "↗", title: "Top-right" },
+                     { value: "bottom-left", label: "↙", title: "Bottom-left" },
+                     { value: "bottom-right", label: "↘", title: "Bottom-right" }
+                      ].map(corner => (
+                   <label key={corner.value} className="flex cursor-pointer items-center gap-1">
+                    <span className="text-gray-400" title={corner.title}>{corner.label}</span>
+                      <input
+                        type="radio"
+                        name={`corner-${idx}`}
+                        value={corner.value }
+                        checked={row.cornerToCut === corner.value}
+                        onChange={() => update(idx, { cornerToCut: corner.value?? "bottom-left"})}
+                        className="h-3 w-3 accent-amber-500"
+                       />
+                   </label>
+                   ))}
+                  </div>
+                  </td>
                     {/* Cantidad */}
-                    <td className="px-1 py-1">
+                    {/* <td className="px-1 py-1">
                       <input
                         type="number" min={1} value={row.quantity}
                         onChange={e => update(idx, { quantity: +e.target.value })}
                         className="w-10 rounded border border-gray-700 bg-gray-900 px-1.5 py-0.5 text-xs text-gray-200 focus:outline-none"
                       />
-                    </td>
+                    </td> */}
 
                     {/* Cantos */}
                     <td className="px-1 py-1">
@@ -1004,6 +1241,7 @@ export function ComponentTemplatesEditor({
                         ))}
                       </div>
                     </td>
+  
 
                     {/* Material default */}
                     <td className="px-1 py-1">
@@ -1066,7 +1304,7 @@ export function ComponentTemplatesEditor({
           <Suspense fallback={
             <div className="h-80 w-full animate-pulse rounded-lg bg-gray-800" />
           }>
-            <Preview3D rows={rows} W={previewW} H={previewH} D={previewD} highlightIdx={highlightIdx} thicknessMM={thicknessMM} />
+            <Preview3D rows={rows} W={previewW} H={previewH} D={previewD} highlightIdx={highlightIdx} thicknessMM={thicknessMM} zocalo={zocalo} />
           </Suspense>
 
           {/* Variables en tiempo real */}

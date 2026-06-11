@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { db }      from "@/server/db";
 import { Decimal } from "@prisma/client/runtime/library";
 import { pricingService } from "./pricing.service";
 import { createId } from "@paralleldrive/cuid2"; // pnpm add @paralleldrive/cuid2
+import type { ComponentTemplate, QuoteItemComponent } from "@prisma/client";
 
 // ─── Enums inline — nunca importar de @prisma/client en servicios del servidor
 // (evita el problema de output path del generador)
@@ -80,6 +83,8 @@ function evalFormula(
   IW:number,
   ID:number,
   IH:number,
+  CX:number,
+  CY:number
 ): number {
   // Reemplazar variables — \b asegura que no toca "WIDTH", "DEPTH", etc.
   const expr = formula
@@ -91,6 +96,8 @@ function evalFormula(
     .replace(/\bIW\b/g, String(IW))
     .replace(/\bID\b/g, String(ID))
     .replace(/\bIH\b/g, String(IH))
+    .replace(/\bCX\b/g, String(CX))
+    .replace(/\bCY\b/g, String(CY))
     .replace(/\bD\b/g, String(D));
 
   // Validar que solo contenga caracteres seguros antes de evaluar
@@ -137,6 +144,7 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   const item = await db.quoteItem.findUniqueOrThrow({
     where: { id: quoteItemId },
     include: {
+      components:true,
       elementType: {
         include: {
           componentTemplates: { orderBy: { sortOrder: "asc" } },
@@ -158,8 +166,14 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
       `El instalador (userId: ${item.project.userId}) no tiene catálogo configurado.`
     );
   }
+  const quoteItemComponents=item.components
+  const quoteItemEsquinero=quoteItemComponents.find(c=>c.componentType=="ESQUINERO")
+  console.log("componentRows",quoteItemEsquinero,quoteItemComponents)
+  const CutX=quoteItemEsquinero?.CutX??0
+  const CutY=quoteItemEsquinero?.CutY??0
 
   const { width: W, height: H, depth: D } = item;
+
   // introducir T y ZO a las variables del item 
   const ZO=7;
   const T=1.8
@@ -220,10 +234,10 @@ export async function instantiateBOM(quoteItemId: string): Promise<void> {
   let totalBoardArea = 0;
 
   for (const tmpl of templates) {
-    const compW = evalFormula(tmpl.widthFormula,      W, H, D,ZO,T,IW,ID,IH);
-    const compH = evalFormula(tmpl.heightFormula,     W, H, D,ZO,T,IW,ID,IH);
+    const compW = evalFormula(tmpl.widthFormula,      W, H, D,ZO,T,IW,ID,IH,CutX??0,CutY??0);
+    const compH = evalFormula(tmpl.heightFormula,     W, H, D,ZO,T,IW,ID,IH,CutX??0,CutY??0);
     // depthFormula tiene @default("D") en el schema — siempre existe
-    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D,ZO,T,IW,ID,IH);
+    const compD = evalFormula(tmpl.depthFormula ?? "D", W, H, D,ZO,T,IW,ID,IH,CutX??0,CutY??0);
     let faceWidth: number, faceHeight: number, thicknessCm: number;
 switch (tmpl.componentType) {
   case "LATERAL":
@@ -232,6 +246,11 @@ switch (tmpl.componentType) {
     faceWidth = compD;
     faceHeight = compH;
     break;
+  case "ESQUINERO":  
+  thicknessCm = compH;
+    faceWidth = compW+CutY;
+    faceHeight = compD-CutX;
+  break;
   case "TECHO":
   case "PISO":
   case "ENTREPAÑO":
@@ -269,12 +288,12 @@ const areaM2 = (faceWidth * faceHeight * tmpl.quantity) / 10000;
       widthCm:         faceWidth,
       heightCm:        faceHeight,
       thicknessMM:     tmpl.thicknessMM,
-      widthFormula:  tmpl.widthFormula,
-      heightFormula: tmpl.heightFormula,
-      depthFormula:  tmpl.depthFormula,
-      posXFormula:   tmpl.posXFormula,
-      posYFormula:   tmpl.posYFormula,
-      posZFormula:   tmpl.posZFormula,
+      widthFormula:    tmpl.widthFormula,
+      heightFormula:   tmpl.heightFormula,
+      depthFormula:    tmpl.depthFormula,
+      posXFormula:     tmpl.posXFormula,
+      posYFormula:     tmpl.posYFormula,
+      posZFormula:     tmpl.posZFormula,
       quantity:        tmpl.quantity,
       materialId:      mat?.id ?? null,
       surfaceFinishId: fin?.id ?? null,

@@ -215,21 +215,23 @@ export class KitchenScene {
     // El grupo puede tener posiciones pre-calculadas por layoutService
     // (almacenadas en posX/posZ de cada QuoteItem en cm).
     // Las usamos directamente y solo necesitamos añadir los offsets de categoría.
-
+    let i =1
     for (const item of group.items) {
       const cat  = item.elementType.category as ElementCategory;
       const rotY = (-(item.rotationY * Math.PI))/ 180;
+ 
 
 
       // Instancia principal (index 0)
       results.push({
         item,
-        posX: Math.cos(rotY)*(item.posX-item.width/2)/100 +Math.sin(rotY)*(item.width/2-item.posZ)/100,
+        posX: -(item.width)/200 +(item.width*(i))/100 ,
         posY: 0 ,
-        posZ: Math.cos(rotY)*(item.depth+item.posZ) /100 +Math.sin(rotY)*(item.posX-item.width/2)/100,
+        posZ: item.depth/200,
         rotY,
         instanceIndex: 0,
       });
+       i+=1;
       // results.push({
       //   item,
       //   posX: item.posX / 100 +Math.sin(rotY)*item.width/200-Math.sin(rotY)*item.depth/200 -(item.rotationY===-90?item.depth/200:0)-(item.rotationY===-180?item.width/100:0)-(item.rotationY===180?(item.width/100)+0.15:0),
@@ -241,23 +243,23 @@ export class KitchenScene {
 
       // Instancias extra para quantity > 1
       // Se desplazan a lo largo de la dirección de rotación del item
-      for (let i = 1; i < item.quantity; i++) {
-        const widthM   = item.width / 100;
-        const extraX   = item.posX / 100 + Math.cos(rotY) * widthM * i;
-        const extraZ   = item.posZ / 100 + Math.sin(rotY) * widthM * i;
+    //   for (let i = 1; i < item.quantity; i++) {
+    //     const widthM   = item.width / 100;
+    //     const extraX   = item.posX / 100 + Math.cos(rotY) * widthM * i;
+    //     const extraZ   = item.posZ / 100 + Math.sin(rotY) * widthM * i;
 
        
 
-        results.push({
-          item,
-          posX: extraX,
-          posY: 0,
-          posZ: extraZ,
-          rotY,
-          instanceIndex: i,
-        });
-      }
-    }
+    //     results.push({
+    //       item,
+    //       posX: extraX,
+    //       posY: 0,
+    //       posZ: extraZ,
+    //       rotY,
+    //       instanceIndex: i,
+    //     });
+    //   }
+     }
     console.log(results,"results")
     return results;
   }
@@ -312,6 +314,8 @@ private buildParametricParams(item: QuoteItem): ParametricObjectParams2 {
       posXFormula: c?.posXFormula??"H-ZO",
       posYFormula: c?.posYFormula,
       posZFormula: c?.posZFormula,
+      CutX:       c?.CutX??0,
+      CutY:       c?.CutY??0,
 
       quantity: c.quantity,
       sortOrder: c?.sortOrder,
@@ -360,20 +364,25 @@ private buildParametricParams(item: QuoteItem): ParametricObjectParams2 {
 
     for (const group of project.layoutGroups) {
       const placements = this.resolveGroupPositions(group);
+      const layoutGroup:  THREE.Group = new THREE.Group();
 
       for (const placement of placements) {
         const { item, posX, posY, posZ, rotY, instanceIndex } = placement;
        const params = this.buildParametricParams(item);
-       console.log(params?.materialConfig,"params")
+      //  console.log(params?.materialConfig,"params")
 
 const obj = new DynamicParametricObject(params);
         if (!obj) continue;
 
-        obj.rotation.y = rotY;
+        // obj.rotation.y = rotY;
         obj.position.set(posX, posY, posZ);
         // DynamicParametricObject handles materials individually from component templates
         // Do not apply global material config to avoid overriding component-specific colors
-        this.itemsGroup.add(obj);
+       layoutGroup.add(obj);
+        layoutGroup.rotation.y=rotY
+        layoutGroup.position.set(group.startX/100,0,group.startY/100)
+        this.itemsGroup.add(layoutGroup);
+
 
         if (instanceIndex === 0) {
           // Crear estado del item con la instancia principal

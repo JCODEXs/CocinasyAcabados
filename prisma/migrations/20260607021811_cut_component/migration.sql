@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "ComponentTemplate" ADD COLUMN     "CutX" TEXT NOT NULL DEFAULT 'CX',
+ADD COLUMN     "CutY" TEXT NOT NULL DEFAULT 'CY';

@@ -41,7 +41,7 @@ export default function HomePage() {
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-2">
               <div className="mx-auto flex h-18 w-72 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl font-bold text-white shadow-md">
-                <img src="/logo2.jpeg" alt="Logo" className="h-18 w-22 rounded-lg ml-2 mr-4 object-cover" />
+                <img src="/logo2.png" alt="Logo" className="h-18 w-22 rounded-lg ml-2 mr-4 object-cover" />
                 <div>Cocinas y Acabados</div>
               </div>
             </div>
